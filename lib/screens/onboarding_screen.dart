@@ -1,3 +1,4 @@
+import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -75,6 +76,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _controller = PageController();
   int _index = 0;
+  int _animToken = 0;
 
   @override
   void dispose() {
@@ -105,7 +107,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Pastel corner blobs like HTML onboarding
           Positioned(
             top: -30,
             left: -30,
@@ -151,10 +152,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       child: Text(
                         'Skip',
                         style: AppTextStyles.bodyMedium.copyWith(
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w600,
                           color: isFinal
-                              ? Colors.white.withValues(alpha: 0.8)
-                              : AppColors.textSecondary,
+                              ? AppColors.primaryBackground
+                              : page.accent,
                         ),
                       ),
                     ),
@@ -164,9 +165,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   child: PageView.builder(
                     controller: _controller,
                     itemCount: _pages.length,
-                    onPageChanged: (value) => setState(() => _index = value),
+                    onPageChanged: (value) {
+                      setState(() {
+                        _index = value;
+                        _animToken++;
+                      });
+                    },
                     itemBuilder: (context, index) {
-                      return _OnboardingPageView(page: _pages[index]);
+                      return _OnboardingPageView(
+                        page: _pages[index],
+                        isActive: index == _index,
+                        animationToken: _animToken,
+                      );
                     },
                   ),
                 ),
@@ -191,10 +201,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Material(
                       color:
                           isFinal ? AppColors.primaryBackground : page.accent,
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(AppRadii.sm),
                       child: InkWell(
                         onTap: _onPrimary,
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
                         child: Center(
                           child: Text(
                             page.buttonLabel,
@@ -219,25 +229,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 class _OnboardingPageView extends StatelessWidget {
-  const _OnboardingPageView({required this.page});
+  const _OnboardingPageView({
+    required this.page,
+    required this.isActive,
+    required this.animationToken,
+  });
 
   final _OnboardingPageData page;
+  final bool isActive;
+  final int animationToken;
 
   @override
   Widget build(BuildContext context) {
     final isFinal = page.isFinal;
     final size = MediaQuery.sizeOf(context);
-    final imageWidth = (size.width * 0.58).clamp(180.0, 280.0);
+    final imageWidth = (size.width * 0.68).clamp(200.0, 320.0);
     final imageHeight = imageWidth * 0.9;
+    final titleStyle =
+        isFinal ? AppTextStyles.onAccentTitle : AppTextStyles.headlineLarge;
+    final bodyStyle =
+        isFinal ? AppTextStyles.onAccentBody : AppTextStyles.secondary;
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final maxImageH = constraints.maxHeight * 0.48;
-        final h = imageHeight.clamp(140.0, maxImageH);
-        final w = (h / 0.9).clamp(160.0, imageWidth);
+        final maxImageH = constraints.maxHeight * 0.54;
+        final h = imageHeight.clamp(160.0, maxImageH);
+        final w = (h / 0.9).clamp(180.0, imageWidth);
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(0, 4, 0, 8),
+          padding: const EdgeInsets.fromLTRB(0, 22, 0, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -328,23 +348,48 @@ class _OnboardingPageView extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    Text(
-                      page.title,
-                      textAlign: TextAlign.left,
-                      style: isFinal
-                          ? AppTextStyles.onAccentTitle
-                          : AppTextStyles.headlineLarge,
-                    ),
+                    if (isActive)
+                      AnimatedTextKit(
+                        key: ValueKey('title-$animationToken-${page.title}'),
+                        isRepeatingAnimation: false,
+                        totalRepeatCount: 1,
+                        displayFullTextOnTap: true,
+                        animatedTexts: [
+                          TypewriterAnimatedText(
+                            page.title,
+                            textAlign: TextAlign.left,
+                            textStyle: titleStyle,
+                            speed: const Duration(milliseconds: 38),
+                            cursor: '',
+                          ),
+                        ],
+                      )
+                    else
+                      Text(
+                        page.title,
+                        textAlign: TextAlign.left,
+                        style: titleStyle.copyWith(
+                          color: titleStyle.color?.withValues(alpha: 0),
+                        ),
+                      ),
                     const SizedBox(height: 10),
-                    Text(
-                      page.description,
-                      textAlign: TextAlign.left,
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: isFinal
-                          ? AppTextStyles.onAccentBody
-                          : AppTextStyles.secondary,
-                    ),
+                    if (isActive)
+                      _StaggeredFadeWords(
+                        key: ValueKey('desc-$animationToken-${page.title}'),
+                        text: page.description,
+                        style: bodyStyle,
+                        startDelay: const Duration(milliseconds: 280),
+                      )
+                    else
+                      Text(
+                        page.description,
+                        textAlign: TextAlign.left,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: bodyStyle.copyWith(
+                          color: bodyStyle.color?.withValues(alpha: 0),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -353,6 +398,89 @@ class _OnboardingPageView extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Word-by-word fade-in for onboarding body copy.
+class _StaggeredFadeWords extends StatefulWidget {
+  const _StaggeredFadeWords({
+    super.key,
+    required this.text,
+    required this.style,
+    this.startDelay = Duration.zero,
+  });
+
+  final String text;
+  final TextStyle style;
+  final Duration startDelay;
+
+  @override
+  State<_StaggeredFadeWords> createState() => _StaggeredFadeWordsState();
+}
+
+class _StaggeredFadeWordsState extends State<_StaggeredFadeWords>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final List<String> _words;
+
+  @override
+  void initState() {
+    super.initState();
+    _words = widget.text.split(RegExp(r'\s+'));
+    final totalMs = 280 + (_words.length * 55);
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: totalMs),
+    );
+    Future<void>.delayed(widget.startDelay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Text.rich(
+          TextSpan(
+            children: [
+              for (var i = 0; i < _words.length; i++) ...[
+                WidgetSpan(
+                  alignment: PlaceholderAlignment.baseline,
+                  baseline: TextBaseline.alphabetic,
+                  child: Opacity(
+                    opacity: _wordOpacity(i),
+                    child: Text(
+                      _words[i],
+                      style: widget.style,
+                    ),
+                  ),
+                ),
+                if (i < _words.length - 1)
+                  TextSpan(text: ' ', style: widget.style),
+              ],
+            ],
+          ),
+          textAlign: TextAlign.left,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+        );
+      },
+    );
+  }
+
+  double _wordOpacity(int index) {
+    final start = index / (_words.length + 2);
+    final end = (index + 2.2) / (_words.length + 2);
+    final t = ((_controller.value - start) / (end - start)).clamp(0.0, 1.0);
+    return Curves.easeOut.transform(t);
   }
 }
 

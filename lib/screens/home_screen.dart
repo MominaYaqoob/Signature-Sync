@@ -5,6 +5,7 @@ import '../models/document_model.dart';
 import '../models/signature_model.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
+import '../widgets/pressable_scale.dart';
 
 String _shortDate(DateTime d) {
   const months = [
@@ -14,9 +15,14 @@ String _shortDate(DateTime d) {
   return '${months[d.month - 1]} ${d.day}';
 }
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   static final _homeSignatures = <SignatureModel>[
     SignatureModel(
       id: 'sig_aliza',
@@ -48,42 +54,65 @@ class HomeScreen extends StatelessWidget {
     ),
   ];
 
+  Future<void> _onRefresh() async {
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      body: SafeArea(
+      body: RefreshIndicator(
+        color: AppColors.accentPurple,
+        backgroundColor: AppColors.cardBackground,
+        onRefresh: _onRefresh,
         child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                  AppSpacing.xl,
+                  0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _HomeHeader(
                       onSettings: () => context.go('/settings'),
                     ),
-                    const SizedBox(height: 22),
+                    const SizedBox(height: AppSpacing.lg),
                     const _QuickActionsGrid(),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: AppSpacing.xl + AppSpacing.xs),
                     _SectionTitle(
                       title: 'My signatures',
                       onSeeAll: () => context.go('/signatures'),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpacing.sm),
                   ],
                 ),
               ),
             ),
             SliverToBoxAdapter(
               child: SizedBox(
-                height: 108,
+                height: 118,
                 child: ListView.separated(
+                  clipBehavior: Clip.none,
                   scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.xl,
+                    AppSpacing.xs,
+                    AppSpacing.xl,
+                    AppSpacing.xs,
+                  ),
                   itemCount: _homeSignatures.length + 1,
-                  separatorBuilder: (_, _) => const SizedBox(width: 10),
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: AppSpacing.sm),
                   itemBuilder: (context, index) {
                     if (index == _homeSignatures.length) {
                       return const _AddSignatureCard();
@@ -102,7 +131,12 @@ class HomeScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(18, 28, 18, 12),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.xl + AppSpacing.xs,
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                ),
                 child: _SectionTitle(
                   title: 'Recent documents',
                   onSeeAll: () => context.go('/documents'),
@@ -110,25 +144,26 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
               sliver: SliverList.separated(
                 itemCount: _homeDocuments.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: AppSpacing.sm),
                 itemBuilder: (context, index) {
                   final doc = _homeDocuments[index];
                   return _DocumentCard(
                     title: doc.title,
                     subtitle: 'Signed · ${_shortDate(doc.updatedAt)}',
                     onShare: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Share coming soon')),
-                      );
+                      context.push('/quick-share');
                     },
                   );
                 },
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: AppSpacing.xl),
+            ),
           ],
         ),
       ),
@@ -151,7 +186,6 @@ class _HomeHeader extends StatelessWidget {
             title: 'Sign smart',
             subtitle: 'Welcome back',
             accent: AppColors.accentPink,
-            barWidth: 48,
             style: AppTextStyles.titleLarge.copyWith(
               fontSize: 24,
               height: 1.2,
@@ -159,20 +193,21 @@ class _HomeHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Material(
-          color: AppColors.softPink,
-          shape: const CircleBorder(
-            side: BorderSide(color: AppColors.accentPink, width: 1.2),
-          ),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onSettings,
+        PressableScale(
+          onTap: onSettings,
+          borderRadius: BorderRadius.circular(999),
+          child: Material(
+            color: AppColors.primaryBackground,
+            shape: const CircleBorder(
+              side: BorderSide(color: AppColors.accentPurple, width: 1.4),
+            ),
+            elevation: 0,
             child: const SizedBox(
               width: 44,
               height: 44,
               child: Icon(
                 Icons.settings_rounded,
-                color: AppColors.accentPink,
+                color: AppColors.accentPurple,
                 size: 22,
               ),
             ),
@@ -202,22 +237,18 @@ class _SectionTitle extends StatelessWidget {
   }
 }
 
-enum _ActionHighlight { none, brand }
-
 class _QuickAction {
   const _QuickAction({
     required this.label,
     required this.icon,
-    required this.iconColor,
-    required this.tileColor,
-    this.highlight = _ActionHighlight.none,
+    required this.gradient,
+    required this.shadowColor,
   });
 
   final String label;
   final IconData icon;
-  final Color iconColor;
-  final Color tileColor;
-  final _ActionHighlight highlight;
+  final LinearGradient gradient;
+  final Color shadowColor;
 }
 
 class _QuickActionsGrid extends StatelessWidget {
@@ -227,39 +258,38 @@ class _QuickActionsGrid extends StatelessWidget {
     _QuickAction(
       label: 'Draw',
       icon: Icons.draw_rounded,
-      iconColor: AppColors.accentPink,
-      tileColor: AppColors.softPink,
+      gradient: AppColors.pinkGradient,
+      shadowColor: AppColors.accentPink,
     ),
     _QuickAction(
       label: 'Scan',
       icon: Icons.photo_camera_outlined,
-      iconColor: AppColors.accentOrange,
-      tileColor: AppColors.softOrange,
+      gradient: AppColors.orangeGradient,
+      shadowColor: AppColors.accentOrange,
     ),
     _QuickAction(
       label: 'Auto',
       icon: Icons.auto_awesome_rounded,
-      iconColor: AppColors.accentBlue,
-      tileColor: AppColors.softBlue,
+      gradient: AppColors.blueGradient,
+      shadowColor: AppColors.accentBlue,
     ),
     _QuickAction(
       label: 'Templates',
       icon: Icons.grid_view_rounded,
-      iconColor: AppColors.accentMintGreen,
-      tileColor: AppColors.softGreen,
+      gradient: AppColors.greenGradient,
+      shadowColor: AppColors.accentMintGreen,
     ),
     _QuickAction(
       label: 'Sign doc',
       icon: Icons.upload_file_outlined,
-      iconColor: AppColors.accentPurple,
-      tileColor: AppColors.softPurple,
+      gradient: AppColors.violetGradient,
+      shadowColor: AppColors.accentPurple,
     ),
     _QuickAction(
       label: 'Share',
       icon: Icons.send_rounded,
-      iconColor: AppColors.textOnAccent,
-      tileColor: AppColors.accentPink,
-      highlight: _ActionHighlight.brand,
+      gradient: AppColors.purpleGradient,
+      shadowColor: AppColors.accentPink,
     ),
   ];
 
@@ -271,13 +301,68 @@ class _QuickActionsGrid extends StatelessWidget {
       itemCount: _actions.length,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 3,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
+        mainAxisSpacing: AppSpacing.sm,
+        crossAxisSpacing: AppSpacing.sm,
         childAspectRatio: 1.05,
       ),
       itemBuilder: (context, index) {
-        return _QuickActionCard(action: _actions[index]);
+        return _StaggeredEntrance(
+          index: index,
+          child: _QuickActionCard(action: _actions[index]),
+        );
       },
+    );
+  }
+}
+
+class _StaggeredEntrance extends StatefulWidget {
+  const _StaggeredEntrance({required this.index, required this.child});
+
+  final int index;
+  final Widget child;
+
+  @override
+  State<_StaggeredEntrance> createState() => _StaggeredEntranceState();
+}
+
+class _StaggeredEntranceState extends State<_StaggeredEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fade;
+  late final Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.18),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+    Future<void>.delayed(Duration(milliseconds: 50 * widget.index), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(
+        position: _slide,
+        child: widget.child,
+      ),
     );
   }
 }
@@ -289,77 +374,70 @@ class _QuickActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final highlighted = action.highlight != _ActionHighlight.none;
-    final navyLabel = highlighted;
+    final radius = BorderRadius.circular(AppRadii.md);
 
-    final decoration = switch (action.highlight) {
-      _ActionHighlight.brand => AppDecorations.card(
-          radius: 19,
-          gradient: AppColors.purpleGradient,
-        ).copyWith(
-          boxShadow: AppShadows.tinted(color: AppColors.accentPurple),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.28),
-            width: 1.2,
-          ),
-        ),
-      _ActionHighlight.none => BoxDecoration(
-          color: action.tileColor,
-          borderRadius: BorderRadius.circular(19),
-          border: Border.all(
-            color: action.iconColor.withValues(alpha: 0.28),
-            width: 1.2,
-          ),
-          boxShadow: AppShadows.card,
-        ),
-    };
+    final decoration = AppDecorations.card(
+      radius: AppRadii.md,
+      sheen: false,
+      prominent: true,
+      gradient: action.gradient,
+    ).copyWith(
+      boxShadow: AppShadows.tinted(color: action.shadowColor),
+      border: Border.all(
+        color: Colors.white.withValues(alpha: 0.28),
+        width: 1.2,
+      ),
+    );
 
-    return Container(
-      decoration: decoration,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (action.label == 'Draw') {
-              context.push('/draw-signature');
-              return;
-            }
-            if (action.label == 'Scan') {
-              context.push('/scan-signature');
-              return;
-            }
-            if (action.label == 'Auto') {
-              context.push('/auto-signature');
-              return;
-            }
-            if (action.label == 'Sign doc') {
-              context.push('/sign-document');
-              return;
-            }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('${action.label} coming soon')),
-            );
-          },
-          borderRadius: BorderRadius.circular(19),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(action.icon, color: action.iconColor, size: 26),
-                const SizedBox(height: 10),
-                Text(
-                  action.label,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.tileLabel.copyWith(
-                    color: navyLabel ? Colors.white : action.iconColor,
-                  ),
-                ),
-              ],
+    return PressableScale(
+      borderRadius: radius,
+      onTap: () {
+        if (action.label == 'Draw') {
+          context.push('/draw-signature');
+          return;
+        }
+        if (action.label == 'Scan') {
+          context.push('/scan-signature');
+          return;
+        }
+        if (action.label == 'Auto') {
+          context.push('/auto-signature');
+          return;
+        }
+        if (action.label == 'Sign doc') {
+          context.push('/sign-document');
+          return;
+        }
+        if (action.label == 'Templates') {
+          context.push('/templates');
+          return;
+        }
+        if (action.label == 'Share') {
+          context.push('/quick-share');
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${action.label} coming soon')),
+        );
+      },
+      child: Container(
+        decoration: decoration,
+        padding: AppSpacing.tilePadding,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(action.icon, color: AppColors.textOnAccent, size: 26),
+            const SizedBox(height: 10),
+            Text(
+              action.label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTextStyles.tileLabel.copyWith(
+                color: AppColors.textOnAccent,
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -379,17 +457,17 @@ class _SignaturePreviewCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: 140,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.lg,
+      ),
+      decoration: AppDecorations.card(
         color: color == AppColors.accentPink
             ? AppColors.softPink
             : AppColors.softOrange,
-        borderRadius: BorderRadius.circular(19),
-        border: Border.all(
-          color: color.withValues(alpha: 0.28),
-          width: 1.2,
-        ),
-        boxShadow: AppShadows.card,
+        radius: AppRadii.md,
+        prominent: true,
+        borderColor: color.withValues(alpha: 0.28),
       ),
       child: Center(
         child: Text(
@@ -404,24 +482,60 @@ class _SignaturePreviewCard extends StatelessWidget {
   }
 }
 
-class _AddSignatureCard extends StatelessWidget {
+class _AddSignatureCard extends StatefulWidget {
   const _AddSignatureCard();
 
   @override
+  State<_AddSignatureCard> createState() => _AddSignatureCardState();
+}
+
+class _AddSignatureCardState extends State<_AddSignatureCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DashedRRectPainter(
-        color: AppColors.accentPurple.withValues(alpha: 0.35),
-        radius: 19,
-      ),
-      child: SizedBox(
-        width: 88,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
+    return AnimatedBuilder(
+      animation: _pulse,
+      builder: (context, child) {
+        final t = Curves.easeInOut.transform(_pulse.value);
+        final scale = 1 + (t * 0.03);
+        final opacity = 0.7 + (t * 0.3);
+        return Transform.scale(
+          scale: scale,
+          child: Opacity(
+            opacity: opacity.clamp(0.7, 1.0),
+            child: child,
+          ),
+        );
+      },
+      child: CustomPaint(
+        painter: _DashedRRectPainter(
+          color: AppColors.accentPurple.withValues(alpha: 0.35),
+          radius: AppRadii.md,
+        ),
+        child: SizedBox(
+          width: 88,
+          height: 100,
+          child: PressableScale(
             onTap: () => context.go('/signatures'),
-            borderRadius: BorderRadius.circular(19),
-            child: Center(
+            borderRadius: BorderRadius.circular(AppRadii.md),
+            child: const Center(
               child: Icon(
                 Icons.add_rounded,
                 color: AppColors.textSecondary,
@@ -489,9 +603,9 @@ class _DocumentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: AppSpacing.cardPadding,
       decoration: AppDecorations.card(
-        radius: 19,
+        radius: AppRadii.md,
         borderColor: AppColors.accentPurple.withValues(alpha: 0.16),
       ),
       child: Row(
@@ -501,7 +615,7 @@ class _DocumentCard extends StatelessWidget {
             height: 40,
             decoration: BoxDecoration(
               color: AppColors.accentPurple.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(AppRadii.sm),
             ),
             child: const Icon(
               Icons.picture_as_pdf_rounded,
@@ -509,7 +623,7 @@ class _DocumentCard extends StatelessWidget {
               size: 20,
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -533,13 +647,16 @@ class _DocumentCard extends StatelessWidget {
               ],
             ),
           ),
-          IconButton(
-            onPressed: onShare,
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(
-              Icons.ios_share_rounded,
-              color: AppColors.textSecondary,
-              size: 20,
+          PressableScale(
+            onTap: onShare,
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(
+                Icons.ios_share_rounded,
+                color: AppColors.textSecondary,
+                size: 20,
+              ),
             ),
           ),
         ],

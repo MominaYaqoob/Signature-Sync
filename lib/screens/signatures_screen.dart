@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../models/signature_model.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
+import '../widgets/pressable_scale.dart';
 
 class SignaturesScreen extends StatefulWidget {
   const SignaturesScreen({super.key});
@@ -25,12 +26,12 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
       context: context,
       backgroundColor: AppColors.cardBackground,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.lg)),
       ),
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, AppSpacing.sm, 20, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -119,7 +120,7 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
         return AlertDialog(
           backgroundColor: AppColors.cardBackground,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(AppRadii.md),
           ),
           title: Text(
             'Rename signature',
@@ -177,12 +178,12 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
       context: context,
       backgroundColor: AppColors.cardBackground,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadii.lg)),
       ),
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 12, 8, 12),
+            padding: const EdgeInsets.fromLTRB(8, AppSpacing.sm, 8, AppSpacing.sm),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -245,44 +246,63 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
-              child: AccentTitle(
-                title: 'My Signatures',
-                accent: AppColors.accentPurple,
-                barWidth: 44,
-                style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
-              ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.sm,
+              AppSpacing.xl,
+              AppSpacing.sm,
             ),
-            Expanded(
-              child: isEmpty
-                  ? _EmptySignatures(onCreate: _showCreateSheet)
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                      itemCount: _signatures.length + 1,
-                      separatorBuilder: (_, _) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) {
-                        if (index == _signatures.length) {
-                          return _NewSignatureCard(onTap: _showCreateSheet);
-                        }
-                        final signature = _signatures[index];
-                        final color = index.isEven
-                            ? AppColors.accentPurple
-                            : AppColors.accentMintGreen;
-                        return _SignatureCard(
-                          signature: signature,
-                          color: color,
-                          onMenu: () => _openMenu(signature),
-                        );
-                      },
+            child: AccentTitle(
+              title: 'My Signatures',
+              accent: AppColors.accentPurple,
+              style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
+            ),
+          ),
+          Expanded(
+            child: isEmpty
+                ? _EmptySignatures(onCreate: _showCreateSheet)
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.xs,
+                      AppSpacing.xl,
+                      AppSpacing.xl,
                     ),
-            ),
-          ],
-        ),
+                    itemCount: _signatures.length + 2,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: AppSpacing.sm),
+                    itemBuilder: (context, index) {
+                      if (index == _signatures.length) {
+                        return _NewSignatureCard(onTap: _showCreateSheet);
+                      }
+                      if (index == _signatures.length + 1) {
+                        return const _ListFooterHint(
+                          icon: Icons.auto_awesome_outlined,
+                          message:
+                              'Tip: set a default signature for faster signing.',
+                        );
+                      }
+                      final signature = _signatures[index];
+                      final color = index.isEven
+                          ? AppColors.accentPurple
+                          : AppColors.accentMintGreen;
+                      return _SignatureCard(
+                        signature: signature,
+                        color: color,
+                        onTap: () => context.push(
+                          '/signature-detail',
+                          extra: signature,
+                        ),
+                        onMenu: () => _openMenu(signature),
+                      );
+                    },
+                  ),
+          ),
+        ],
       ),
     );
   }
@@ -292,70 +312,81 @@ class _SignatureCard extends StatelessWidget {
   const _SignatureCard({
     required this.signature,
     required this.color,
+    required this.onTap,
     required this.onMenu,
   });
 
   final SignatureModel signature;
   final Color color;
+  final VoidCallback onTap;
   final VoidCallback onMenu;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: AppDecorations.card(
-        radius: 19,
-        borderColor: color.withValues(alpha: 0.22),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Flexible(
-                  child: Text(
-                    signature.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.signaturePreview(
-                      color: color,
-                      size: 30,
-                    ),
-                  ),
-                ),
-                if (signature.isDefault) ...[
-                  const SizedBox(width: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentMintGreen.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: Container(
+        padding: AppSpacing.cardPadding,
+        decoration: AppDecorations.card(
+          radius: AppRadii.md,
+          prominent: true,
+          borderColor: color.withValues(alpha: 0.22),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Row(
+                children: [
+                  Flexible(
                     child: Text(
-                      'Default',
-                      style: AppTextStyles.labelMedium.copyWith(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.accentMintGreen,
+                      signature.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.signaturePreview(
+                        color: color,
+                        size: 30,
                       ),
                     ),
                   ),
+                  if (signature.isDefault) ...[
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.xs,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color:
+                            AppColors.accentMintGreen.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        'Default',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.accentMintGreen,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          IconButton(
-            onPressed: onMenu,
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(
-              Icons.more_vert_rounded,
-              color: AppColors.textSecondary,
+            PressableScale(
+              onTap: onMenu,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(
+                  Icons.more_vert_rounded,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -371,33 +402,30 @@ class _NewSignatureCard extends StatelessWidget {
     return CustomPaint(
       painter: _DashedBorderPainter(
         color: AppColors.accentPurple.withValues(alpha: 0.35),
-        radius: 19,
+        radius: AppRadii.md,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(19),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 18),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.add_rounded,
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.xl),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.add_rounded,
+                color: AppColors.accentPurple,
+                size: 22,
+              ),
+              const SizedBox(width: AppSpacing.xs),
+              Text(
+                'New signature',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontWeight: FontWeight.w600,
                   color: AppColors.accentPurple,
-                  size: 22,
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  'New signature',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.accentPurple,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -421,10 +449,9 @@ class _EmptySignatures extends StatelessWidget {
             Container(
               width: 76,
               height: 76,
-              decoration: BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.borderSubtle),
+              decoration: AppDecorations.card(
+                radius: AppRadii.lg,
+                prominent: true,
               ),
               child: const Icon(
                 Icons.gesture_rounded,
@@ -432,12 +459,12 @@ class _EmptySignatures extends StatelessWidget {
                 size: 34,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.xl),
             Text(
               'No signatures yet',
               style: AppTextStyles.titleMedium.copyWith(fontSize: 17),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               'Create your first signature to start signing documents.',
               textAlign: TextAlign.center,
@@ -446,12 +473,11 @@ class _EmptySignatures extends StatelessWidget {
             const SizedBox(height: 22),
             SizedBox(
               height: 48,
-              child: Material(
-                color: AppColors.accentPurple,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  onTap: onCreate,
-                  borderRadius: BorderRadius.circular(14),
+              child: PressableScale(
+                onTap: onCreate,
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                child: DecoratedBox(
+                  decoration: AppDecorations.purpleButton(radius: AppRadii.sm),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 22),
                     child: Center(
@@ -490,49 +516,49 @@ class _CreateOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.altCardBackground,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 22),
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.sm),
+      child: Container(
+        padding: AppSpacing.cardPadding,
+        decoration: AppDecorations.card(
+          color: AppColors.altCardBackground,
+          radius: AppRadii.sm,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(AppRadii.sm),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontWeight: FontWeight.w600,
                     ),
-                    Text(
-                      subtitle,
-                      style: AppTextStyles.labelMedium.copyWith(fontSize: 11),
-                    ),
-                  ],
-                ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: AppTextStyles.labelMedium.copyWith(fontSize: 11),
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textSecondary,
-              ),
-            ],
-          ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textSecondary,
+            ),
+          ],
         ),
       ),
     );
@@ -578,5 +604,44 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
     return oldDelegate.color != color || oldDelegate.radius != radius;
+  }
+}
+
+class _ListFooterHint extends StatelessWidget {
+  const _ListFooterHint({
+    required this.icon,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Container(
+        padding: AppSpacing.cardPadding,
+        decoration: AppDecorations.card(
+          radius: AppRadii.md,
+          elevated: false,
+          sheen: false,
+          color: AppColors.softSurface,
+          borderColor: AppColors.borderSoft,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textSecondary, size: 20),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                message,
+                style: AppTextStyles.bodySmall,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

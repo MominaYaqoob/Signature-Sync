@@ -1,3 +1,5 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -14,7 +16,13 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const SignatureSyncApp());
+  runApp(
+    DevicePreview(
+      // Chrome / web pe mobile frames; real phone pe off.
+      enabled: kIsWeb,
+      builder: (context) => const SignatureSyncApp(),
+    ),
+  );
 }
 
 class SignatureSyncApp extends StatefulWidget {
@@ -34,6 +42,8 @@ class _SignatureSyncAppState extends State<SignatureSyncApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       themeMode: ThemeMode.light,
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
       routerConfig: _router,
     );
   }

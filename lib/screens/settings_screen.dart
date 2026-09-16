@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
+import '../widgets/pressable_scale.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -26,7 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         return AlertDialog(
           backgroundColor: AppColors.cardBackground,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(AppRadii.md),
           ),
           title: Text(
             'Clear all data?',
@@ -64,59 +65,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Future<void> _showAbout() async {
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          title: Text(
-            'About',
-            style: AppTextStyles.titleMedium,
-          ),
-          content: Text(
-            'Signature: Sync\nVersion 1.0.0\n\nSign documents privately on your device.',
-            style: AppTextStyles.secondary.copyWith(
-              fontSize: 13,
-              height: 1.5,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Close',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.accentMintGreen,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
-          children: [
-            AccentTitle(
-              title: 'Settings',
-              accent: AppColors.accentPink,
-              barWidth: 44,
-              style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
-            ),
-            const SizedBox(height: 18),
-            _SettingsCard(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          AppSpacing.sm,
+          AppSpacing.xl,
+          AppSpacing.xl,
+        ),
+        children: [
+          AccentTitle(
+            title: 'Settings',
+            accent: AppColors.accentPink,
+            style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          _SettingsCard(
               child: _SettingsRow(
                 icon: Icons.dark_mode_outlined,
                 label: 'Dark mode',
@@ -162,7 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 10),
             _SettingsCard(
-              onTap: () => _toast('Privacy policy coming soon'),
+              onTap: () => context.push('/privacy'),
               child: const _SettingsRow(
                 icon: Icons.privacy_tip_outlined,
                 label: 'Privacy policy',
@@ -174,7 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 10),
             _SettingsCard(
-              onTap: _showAbout,
+              onTap: () => context.push('/about'),
               child: const _SettingsRow(
                 icon: Icons.info_outline_rounded,
                 label: 'About / App version',
@@ -200,7 +167,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -213,22 +179,21 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    final content = Container(
+      padding: AppSpacing.cardPadding,
       decoration: AppDecorations.card(
-        radius: 19,
+        radius: AppRadii.md,
         borderColor: AppColors.accentPurple.withValues(alpha: 0.16),
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(19),
-          child: Padding(
-            padding: const EdgeInsets.all(13),
-            child: child,
-          ),
-        ),
-      ),
+      child: child,
+    );
+
+    if (onTap == null) return content;
+
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: content,
     );
   }
 }
@@ -253,7 +218,7 @@ class _SettingsRow extends StatelessWidget {
     return Row(
       children: [
         Icon(icon, color: iconColor, size: 22),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Text(
             label,

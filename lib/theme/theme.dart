@@ -24,11 +24,11 @@ class AppColors {
 
   static const Color danger = Color(0xFFF5378C);
 
-  // Soft pastel fills (exact HTML backgrounds)
-  static const Color softPink = Color(0xFFFFE4F1);
-  static const Color softOrange = Color(0xFFFFE9D6);
-  static const Color softBlue = Color(0xFFE4EEFF);
-  static const Color softGreen = Color(0xFFDFFBE6);
+  // Soft pastel fills — deepened for tile/header contrast (same hue family)
+  static const Color softPink = Color(0xFFFFC2DC);
+  static const Color softOrange = Color(0xFFFFD0A3);
+  static const Color softBlue = Color(0xFFC2D6FF);
+  static const Color softGreen = Color(0xFFB5F0C6);
   static const Color softPurple = Color(0xFFF0E4FF);
   static const Color softSurface = Color(0xFFF9F7FB);
   static const Color softDot = Color(0xFFF0E9F5);
@@ -84,7 +84,20 @@ class AppColors {
   static const LinearGradient blueGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [accentBlue, Color(0xFF4CA1FF)],
+    colors: [Color(0xFF4CA1FF), accentBlue],
+  );
+
+  static const LinearGradient orangeGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFFB35A), accentOrange],
+  );
+
+  /// Sign-doc tile — purple only (not pink→purple like Share).
+  static const LinearGradient violetGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFC56BFF), accentPurple],
   );
 }
 
@@ -95,6 +108,20 @@ class AppRadii {
   static const double md = 20;
   static const double lg = 24;
   static const double xl = 28;
+}
+
+/// Shared padding / gap scale for tiles and cards.
+class AppSpacing {
+  AppSpacing._();
+
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 14;
+  static const double lg = 16;
+  static const double xl = 18;
+
+  static const EdgeInsets cardPadding = EdgeInsets.all(md);
+  static const EdgeInsets tilePadding = EdgeInsets.all(sm);
 }
 
 class AppShadows {
@@ -144,32 +171,41 @@ class AppShadows {
 class AppDecorations {
   AppDecorations._();
 
+  /// Soft top-edge highlight — lightens the same base hue (no palette change).
+  static LinearGradient sheenGradient(Color base) {
+    return LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Color.alphaBlend(Colors.white.withValues(alpha: 0.42), base),
+        base,
+      ],
+    );
+  }
+
   static BoxDecoration card({
     Color? color,
     double radius = AppRadii.lg,
     bool elevated = true,
+    bool prominent = false,
+    bool sheen = true,
     Gradient? gradient,
     Color? borderColor,
   }) {
     final base = color ?? AppColors.cardBackground;
-    final wash = gradient ??
-        LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            base,
-          ],
-        );
+    final wash = gradient ?? (sheen ? sheenGradient(base) : null);
     final edge = borderColor ??
         AppColors.accentPurple.withValues(alpha: 0.14);
+    final shadows = !elevated
+        ? null
+        : (prominent ? AppShadows.elevated : AppShadows.card);
 
     return BoxDecoration(
-      gradient: gradient != null ? wash : null,
-      color: gradient == null ? base : null,
+      gradient: wash,
+      color: wash == null ? base : null,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: edge, width: 1.2),
-      boxShadow: elevated ? AppShadows.card : null,
+      boxShadow: shadows,
     );
   }
 

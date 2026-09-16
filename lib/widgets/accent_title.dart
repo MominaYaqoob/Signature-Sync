@@ -10,14 +10,13 @@ Color _softFillFor(Color accent) {
   return AppColors.softPink;
 }
 
-/// Screen title inside a soft colored container + accent bar.
+/// Screen title inside a soft colored container.
 class AccentTitle extends StatelessWidget {
   const AccentTitle({
     super.key,
     required this.title,
     this.style,
     this.accent = AppColors.accentPink,
-    this.barWidth = 44,
     this.trailing,
     this.subtitle,
   });
@@ -25,7 +24,6 @@ class AccentTitle extends StatelessWidget {
   final String title;
   final TextStyle? style;
   final Color accent;
-  final double barWidth;
   final Widget? trailing;
   final String? subtitle;
 
@@ -39,15 +37,13 @@ class AccentTitle extends StatelessWidget {
         Expanded(
           child: Container(
             width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-            decoration: BoxDecoration(
+            padding: AppSpacing.cardPadding,
+            decoration: AppDecorations.card(
               color: fill,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: accent.withValues(alpha: 0.28),
-                width: 1.2,
-              ),
-              boxShadow: AppShadows.card,
+              radius: AppRadii.md,
+              elevated: true,
+              sheen: true,
+              borderColor: accent.withValues(alpha: 0.22),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -67,26 +63,12 @@ class AccentTitle extends StatelessWidget {
                         height: 1.2,
                       ),
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  width: barWidth,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    gradient: LinearGradient(
-                      colors: [
-                        accent,
-                        accent.withValues(alpha: 0.35),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
         ),
         if (trailing != null) ...[
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           trailing!,
         ],
       ],
@@ -116,57 +98,49 @@ class AccentSectionHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
-              decoration: BoxDecoration(
-                color: fill,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: accent.withValues(alpha: 0.26),
-                  width: 1.1,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: AppTextStyles.titleMedium.copyWith(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  Container(
-                    width: 30,
-                    height: 3.5,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(999),
-                      gradient: LinearGradient(
-                        colors: [
-                          accent,
-                          accent.withValues(alpha: 0.3),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+        Flexible(
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.sm,
+            ),
+            decoration: AppDecorations.card(
+              color: fill,
+              radius: AppRadii.sm,
+              elevated: false,
+              sheen: false,
+              borderColor: accent.withValues(alpha: 0.22),
+            ),
+            child: Text(
+              title,
+              style: AppTextStyles.titleMedium.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: accent,
               ),
             ),
           ),
         ),
-        if (actionLabel != null)
-          Padding(
-            padding: const EdgeInsets.only(left: 8),
-            child: GestureDetector(
-              onTap: onAction,
-              child: Text(actionLabel!, style: AppTextStyles.link),
+        if (actionLabel != null) ...[
+          const SizedBox(width: AppSpacing.xs),
+          GestureDetector(
+            onTap: onAction,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+                vertical: AppSpacing.xs,
+              ),
+              // Muted gray — chips carry section color; links stay calm/consistent
+              child: Text(
+                actionLabel!,
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
+        ],
       ],
     );
   }

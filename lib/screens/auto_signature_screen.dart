@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/theme.dart';
+import '../widgets/pressable_scale.dart';
 
 typedef _FontBuilder = TextStyle Function({
   double? fontSize,
@@ -100,14 +101,14 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
   }
 
   void _useSignature() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Using “$_displayName” · ${_styles[_selectedIndex].label}',
-        ),
-      ),
+    context.push(
+      '/save-signature',
+      extra: <String, String>{
+        'name': _displayName,
+        'style': _styles[_selectedIndex].label,
+        'source': 'auto',
+      },
     );
-    context.pop();
   }
 
   @override
@@ -139,7 +140,12 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.sm,
+                AppSpacing.xl,
+                0,
+              ),
               child: TextField(
                 controller: _nameController,
                 style: AppTextStyles.bodyLarge,
@@ -149,19 +155,19 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
                   filled: true,
                   fillColor: AppColors.cardBackground,
                   contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 14,
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.md,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
                     borderSide: const BorderSide(color: AppColors.borderSubtle),
                   ),
                   enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
                     borderSide: const BorderSide(color: AppColors.borderSubtle),
                   ),
                   focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(13),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
                     borderSide: const BorderSide(
                       color: AppColors.accentPurple,
                       width: 1.5,
@@ -171,7 +177,12 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 22, 18, 10),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                22,
+                AppSpacing.xl,
+                10,
+              ),
               child: Text(
                 'CHOOSE A STYLE',
                 style: AppTextStyles.eyebrow.copyWith(
@@ -183,9 +194,15 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
             ),
             Expanded(
               child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  0,
+                  AppSpacing.xl,
+                  AppSpacing.sm,
+                ),
                 itemCount: _styles.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 10),
+                separatorBuilder: (_, _) =>
+                    const SizedBox(height: AppSpacing.sm),
                 itemBuilder: (context, index) {
                   final style = _styles[index];
                   final selected = index == _selectedIndex;
@@ -205,33 +222,26 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.xl,
+                AppSpacing.xs,
+                AppSpacing.xl,
+                20,
+              ),
               child: SizedBox(
                 height: 52,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: AppColors.purpleGradient,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            AppColors.accentPink.withValues(alpha: 0.4),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _useSignature,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Center(
-                        child: Text(
-                          'Use this signature',
-                          style: AppTextStyles.onAccentLabel.copyWith(
-                            fontSize: 14,
-                          ),
+                child: PressableScale(
+                  onTap: _useSignature,
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  child: DecoratedBox(
+                    decoration: AppDecorations.purpleButton(
+                      radius: AppRadii.sm,
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Use this signature',
+                        style: AppTextStyles.onAccentLabel.copyWith(
+                          fontSize: 14,
                         ),
                       ),
                     ),
@@ -263,66 +273,68 @@ class _StylePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: selected
-          ? AppDecorations.card(
-              radius: 14,
-              color: const Color(0xFF4A3A72),
-            ).copyWith(
-              border: Border.all(color: AppColors.accentPurple, width: 1.6),
-              boxShadow: AppShadows.tinted(color: AppColors.accentPurple),
-            )
-          : AppDecorations.card(radius: 14),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        styleLabel,
-                        style: AppTextStyles.labelMedium.copyWith(
-                          fontSize: 10,
-                          color: selected
-                              ? AppColors.accentPurple
-                              : AppColors.textSecondary,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textStyle,
-                      ),
-                    ],
-                  ),
-                ),
-                if (selected)
-                  Container(
-                    width: 28,
-                    height: 28,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accentPurple,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.check_rounded,
-                      color: AppColors.textOnAccent,
-                      size: 18,
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.sm),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+        ),
+        decoration: selected
+            ? AppDecorations.card(
+                radius: AppRadii.sm,
+                color: const Color(0xFF4A3A72),
+                prominent: true,
+                sheen: false,
+              ).copyWith(
+                border: Border.all(color: AppColors.accentPurple, width: 1.6),
+                boxShadow: AppShadows.elevated,
+              )
+            : AppDecorations.card(radius: AppRadii.sm),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    styleLabel,
+                    style: AppTextStyles.labelMedium.copyWith(
+                      fontSize: 10,
+                      color: selected
+                          ? AppColors.accentPurple
+                          : AppColors.textSecondary,
+                      letterSpacing: 0.4,
                     ),
                   ),
-              ],
+                  const SizedBox(height: 6),
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textStyle,
+                  ),
+                ],
+              ),
             ),
-          ),
+            if (selected)
+              Container(
+                width: 28,
+                height: 28,
+                decoration: const BoxDecoration(
+                  color: AppColors.accentPurple,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  color: AppColors.textOnAccent,
+                  size: 18,
+                ),
+              ),
+          ],
         ),
       ),
     );

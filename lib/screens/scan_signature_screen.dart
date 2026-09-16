@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/theme.dart';
+import '../widgets/pressable_scale.dart';
 
 class ScanSignatureScreen extends StatelessWidget {
   const ScanSignatureScreen({super.key});
@@ -81,10 +82,13 @@ class ScanSignatureScreen extends StatelessWidget {
                 const Spacer(flex: 3),
                 _CaptureButton(
                   onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Camera capture coming soon'),
-                      ),
+                    context.push(
+                      '/save-signature',
+                      extra: <String, String>{
+                        'name': 'Scanned signature',
+                        'style': 'Scanned',
+                        'source': 'scan',
+                      },
                     );
                   },
                 ),
@@ -228,34 +232,25 @@ class _CaptureButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onPressed,
-        child: Container(
-          width: 78,
-          height: 78,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            border: Border.all(
-              color: AppColors.accentMintGreen,
-              width: 5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accentMintGreen.withValues(alpha: 0.35),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
+    return PressableScale(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: 78,
+        height: 78,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.white,
+          border: Border.all(
+            color: AppColors.accentMintGreen,
+            width: 5,
           ),
-          child: const Icon(
-            Icons.photo_camera_rounded,
-            color: AppColors.accentPurple,
-            size: 30,
-          ),
+          boxShadow: AppShadows.elevated,
+        ),
+        child: const Icon(
+          Icons.photo_camera_rounded,
+          color: AppColors.accentPurple,
+          size: 30,
         ),
       ),
     );

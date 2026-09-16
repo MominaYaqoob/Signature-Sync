@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/theme.dart';
+import '../widgets/pressable_scale.dart';
 
 class DrawSignatureScreen extends StatefulWidget {
   const DrawSignatureScreen({super.key});
@@ -27,10 +28,14 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
   }
 
   void _save() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Signature saved')),
+    context.push(
+      '/save-signature',
+      extra: <String, String>{
+        'name': 'Aliza',
+        'style': 'Drawn',
+        'source': 'draw',
+      },
     );
-    context.pop();
   }
 
   @override
@@ -39,7 +44,12 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
       backgroundColor: AppColors.primaryBackground,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 8, 18, 20),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.xs,
+            AppSpacing.xl,
+            20,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -60,20 +70,16 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(
+                  decoration: AppDecorations.card(
                     color: const Color(0xFFF8F7FC),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.22),
-                        blurRadius: 16,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
+                    radius: AppRadii.sm,
+                    prominent: true,
+                    sheen: true,
+                    borderColor: AppColors.borderSubtle,
                   ),
                   child: Stack(
                     children: [
@@ -98,8 +104,8 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                           ),
                         ),
                       Positioned(
-                        left: 16,
-                        right: 16,
+                        left: AppSpacing.lg,
+                        right: AppSpacing.lg,
                         bottom: 28,
                         child: Container(
                           height: 1,
@@ -107,8 +113,8 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                         ),
                       ),
                       Positioned(
-                        right: 14,
-                        top: 12,
+                        right: AppSpacing.md,
+                        top: AppSpacing.sm,
                         child: Text(
                           'Preview',
                           style: AppTextStyles.labelMedium.copyWith(
@@ -129,14 +135,15 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                   final color = _penColors[index];
                   final selected = index == _selectedColor;
                   return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: GestureDetector(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+                    child: PressableScale(
                       onTap: () {
                         setState(() {
                           _selectedColor = index;
                           if (_cleared) _cleared = false;
                         });
                       },
+                      borderRadius: BorderRadius.circular(999),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         width: selected ? 34 : 28,
@@ -172,12 +179,15 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                     flex: 2,
                     child: SizedBox(
                       height: 52,
-                      child: Material(
-                        color: AppColors.cardBackground,
-                        borderRadius: BorderRadius.circular(14),
-                        child: InkWell(
-                          onTap: _clear,
-                          borderRadius: BorderRadius.circular(14),
+                      child: PressableScale(
+                        onTap: _clear,
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        child: DecoratedBox(
+                          decoration: AppDecorations.card(
+                            radius: AppRadii.sm,
+                            elevated: false,
+                            sheen: false,
+                          ),
                           child: Center(
                             child: Text(
                               'Clear',
@@ -191,35 +201,23 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     flex: 3,
                     child: SizedBox(
                       height: 52,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: AppColors.purpleGradient,
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accentPink
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: _save,
-                            borderRadius: BorderRadius.circular(14),
-                            child: Center(
-                              child: Text(
-                                'Save Signature',
-                                style: AppTextStyles.onAccentLabel.copyWith(
-                                  fontSize: 14,
-                                ),
+                      child: PressableScale(
+                        onTap: _save,
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        child: DecoratedBox(
+                          decoration: AppDecorations.purpleButton(
+                            radius: AppRadii.sm,
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Save Signature',
+                              style: AppTextStyles.onAccentLabel.copyWith(
+                                fontSize: 14,
                               ),
                             ),
                           ),

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../models/document_model.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
+import '../widgets/pressable_scale.dart';
 
 String _shortDate(DateTime d) {
   const months = [
@@ -61,7 +62,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         return AlertDialog(
           backgroundColor: AppColors.cardBackground,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(AppRadii.md),
           ),
           title: Text(
             'Delete document?',
@@ -103,98 +104,108 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 12, 8, 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _searchOpen
-                        ? TextField(
-                            controller: _searchController,
-                            autofocus: true,
-                            onChanged: (value) =>
-                                setState(() => _query = value),
-                            style: AppTextStyles.bodyMedium,
-                            decoration: InputDecoration(
-                              hintText: 'Search documents',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 10,
-                              ),
-                              suffixIcon: IconButton(
-                                icon: const Icon(Icons.close_rounded),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchOpen = false;
-                                    _query = '';
-                                    _searchController.clear();
-                                  });
-                                },
-                              ),
-                            ),
-                          )
-                        : AccentTitle(
-                            title: 'Documents',
-                            accent: AppColors.accentBlue,
-                            barWidth: 44,
-                            style: AppTextStyles.titleLarge.copyWith(
-                              fontSize: 22,
-                            ),
-                          ),
-                  ),
-                  if (!_searchOpen)
-                    IconButton(
-                      onPressed: () => setState(() => _searchOpen = true),
-                      icon: const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                ],
-              ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              AppSpacing.sm,
+              AppSpacing.xs,
+              AppSpacing.sm,
             ),
-            Expanded(
-              child: isEmpty
-                  ? const _EmptyDocuments()
-                  : docs.isEmpty
-                      ? Center(
-                          child: Text(
-                            'No matches',
-                            style: AppTextStyles.secondary,
+            child: Row(
+              children: [
+                Expanded(
+                  child: _searchOpen
+                      ? TextField(
+                          controller: _searchController,
+                          autofocus: true,
+                          onChanged: (value) =>
+                              setState(() => _query = value),
+                          style: AppTextStyles.bodyMedium,
+                          decoration: InputDecoration(
+                            hintText: 'Search documents',
+                            isDense: true,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                              vertical: 10,
+                            ),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () {
+                                setState(() {
+                                  _searchOpen = false;
+                                  _query = '';
+                                  _searchController.clear();
+                                });
+                              },
+                            ),
                           ),
                         )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(18, 8, 18, 24),
-                          itemCount: docs.length,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
-                            final doc = docs[index];
-                            return _DocumentHistoryCard(
-                              document: doc,
-                              onTap: () => context.push(
-                                '/documents/detail/${doc.id}',
-                                extra: doc,
-                              ),
-                              onShare: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Share coming soon'),
-                                  ),
-                                );
-                              },
-                              onDelete: () => _confirmDelete(doc),
-                            );
-                          },
+                      : AccentTitle(
+                          title: 'Documents',
+                          accent: AppColors.accentBlue,
+                          style: AppTextStyles.titleLarge.copyWith(
+                            fontSize: 22,
+                          ),
                         ),
+                ),
+                if (!_searchOpen)
+                  IconButton(
+                    onPressed: () => setState(() => _searchOpen = true),
+                    icon: const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+              ],
             ),
-          ],
-        ),
+          ),
+          Expanded(
+            child: isEmpty
+                ? const _EmptyDocuments()
+                : docs.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No matches',
+                          style: AppTextStyles.secondary,
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.xl,
+                          AppSpacing.xs,
+                          AppSpacing.xl,
+                          AppSpacing.xl,
+                        ),
+                        itemCount: docs.length + 1,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.sm),
+                        itemBuilder: (context, index) {
+                          if (index == docs.length) {
+                            return const _ListFooterHint(
+                              icon: Icons.upload_file_outlined,
+                              message:
+                                  'Sign a new document from Home → Sign doc.',
+                            );
+                          }
+                          final doc = docs[index];
+                          return _DocumentHistoryCard(
+                            document: doc,
+                            onTap: () => context.push(
+                              '/documents/detail/${doc.id}',
+                              extra: doc,
+                            ),
+                            onShare: () {
+                              context.push('/quick-share');
+                            },
+                            onDelete: () => _confirmDelete(doc),
+                          );
+                        },
+                      ),
+          ),
+        ],
       ),
     );
   }
@@ -233,67 +244,69 @@ class _DocumentHistoryCard extends StatelessWidget {
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
           color: AppColors.danger.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadii.md),
         ),
         child: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
       ),
-      child: Container(
-        decoration: AppDecorations.card(
-          radius: 19,
-          borderColor: tint.withValues(alpha: 0.22),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            onLongPress: onDelete,
-            borderRadius: BorderRadius.circular(19),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: tint.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, color: tint, size: 20),
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        child: Container(
+          decoration: AppDecorations.card(
+            radius: AppRadii.md,
+            borderColor: tint.withValues(alpha: 0.22),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.sm,
+              vertical: AppSpacing.md,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: tint.withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(AppRadii.sm),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          document.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTextStyles.tileLabel,
+                  child: Icon(icon, color: tint, size: 20),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        document.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.tileLabel,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Signed · ${_shortDate(document.updatedAt)}',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          fontSize: 11,
+                          color: AppColors.accentMintGreen,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Signed · ${_shortDate(document.updatedAt)}',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            fontSize: 11,
-                            color: AppColors.accentMintGreen,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    onPressed: onShare,
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(
+                ),
+                PressableScale(
+                  onTap: onShare,
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  child: const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(
                       Icons.ios_share_rounded,
                       color: AppColors.textSecondary,
                       size: 20,
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -316,10 +329,9 @@ class _EmptyDocuments extends StatelessWidget {
             Container(
               width: 76,
               height: 76,
-              decoration: BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.borderSubtle),
+              decoration: AppDecorations.card(
+                radius: AppRadii.lg,
+                prominent: true,
               ),
               child: const Icon(
                 Icons.folder_open_outlined,
@@ -327,7 +339,7 @@ class _EmptyDocuments extends StatelessWidget {
                 size: 34,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.xl),
             Text(
               'No documents signed yet',
               textAlign: TextAlign.center,
@@ -338,6 +350,45 @@ class _EmptyDocuments extends StatelessWidget {
               'Signed PDFs and images will show up here.',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodySmall,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ListFooterHint extends StatelessWidget {
+  const _ListFooterHint({
+    required this.icon,
+    required this.message,
+  });
+
+  final IconData icon;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xs),
+      child: Container(
+        padding: AppSpacing.cardPadding,
+        decoration: AppDecorations.card(
+          radius: AppRadii.md,
+          elevated: false,
+          sheen: false,
+          color: AppColors.softSurface,
+          borderColor: AppColors.borderSoft,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.textSecondary, size: 20),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(
+              child: Text(
+                message,
+                style: AppTextStyles.bodySmall,
+              ),
             ),
           ],
         ),
