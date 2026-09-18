@@ -49,6 +49,8 @@ class SignatureVisual extends StatelessWidget {
       return Image.file(
         File(path),
         fit: fit,
+        width: double.infinity,
+        height: double.infinity,
         filterQuality: FilterQuality.medium,
         errorBuilder: (_, _, _) => _textFallback(),
       );

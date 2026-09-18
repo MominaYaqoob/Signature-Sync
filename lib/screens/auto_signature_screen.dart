@@ -108,6 +108,8 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
         'name': _displayName,
         'style': _styles[_selectedIndex].label,
         'source': 'auto',
+        'imagePath': '',
+        'id': 'sig_${DateTime.now().millisecondsSinceEpoch}',
       },
     );
   }

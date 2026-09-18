@@ -1,16 +1,134 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../models/document_model.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
 
 /// SCREEN A — Upload Document
-class SignUploadScreen extends StatelessWidget {
+class SignUploadScreen extends StatefulWidget {
   const SignUploadScreen({super.key});
 
   @override
+  State<SignUploadScreen> createState() => _SignUploadScreenState();
+}
+
+class _SignUploadScreenState extends State<SignUploadScreen> {
+  bool _busy = false;
+
+  String _fileTypeFromPath(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    if (ext == 'pdf') return 'pdf';
+    return 'image';
+  }
+
+  Future<String> _persistFile(String sourcePath, String originalName) async {
+    final docs = await getApplicationDocumentsDirectory();
+    final dir = Directory('${docs.path}/documents');
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    final ext = originalName.contains('.')
+        ? originalName.split('.').last.toLowerCase()
+        : sourcePath.split('.').last.toLowerCase();
+    final id = 'doc_${DateTime.now().millisecondsSinceEpoch}';
+    final dest = File('${dir.path}/$id.$ext');
+    await File(sourcePath).copy(dest.path);
+    return dest.path;
+  }
+
+  Future<void> _goToPreview({
+    required String filePath,
+    required String fileType,
+  }) async {
+    if (!mounted) return;
+    await context.push(
+      '/sign-document/preview',
+      extra: <String, String>{
+        'filePath': filePath,
+        'fileType': fileType,
+      },
+    );
+  }
+
+  Future<void> _pickFile() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png'],
+      );
+      if (result == null || result.files.isEmpty) return;
+      final file = result.files.single;
+      final path = file.path;
+      if (path == null || path.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not read the selected file')),
+        );
+        return;
+      }
+
+      final persisted = await _persistFile(path, file.name);
+      final type = _fileTypeFromPath(persisted);
+      await _goToPreview(filePath: persisted, fileType: type);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open file: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _scanWithCamera() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final photo = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 90,
+      );
+      if (photo == null) return;
+
+      final persisted = await _persistFile(photo.path, photo.name);
+      await _goToPreview(filePath: persisted, fileType: 'image');
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not capture document: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openRecent(DocumentModel doc) async {
+    final path = doc.filePath;
+    if (path == null || path.isEmpty || !File(path).existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Document file is missing on this device')),
+      );
+      return;
+    }
+    final type = doc.isPdf ? 'pdf' : 'image';
+    await _goToPreview(filePath: path, fileType: type);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final recent = StorageService.getAllDocuments();
+    final recent = StorageService.getAllDocuments()
+        .where((d) => d.hasFile)
+        .toList();
+
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       body: SafeArea(
@@ -31,7 +149,7 @@ class SignUploadScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 12),
                   _UploadCard(
-                    onTap: () => context.push('/sign-document/preview'),
+                    onTap: _busy ? () {} : _pickFile,
                   ),
                   const SizedBox(height: 14),
                   Row(
@@ -40,7 +158,7 @@ class SignUploadScreen extends StatelessWidget {
                         child: _SecondaryAction(
                           icon: Icons.folder_open_outlined,
                           label: 'Choose file',
-                          onTap: () => context.push('/sign-document/preview'),
+                          onTap: _busy ? () {} : _pickFile,
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -48,7 +166,7 @@ class SignUploadScreen extends StatelessWidget {
                         child: _SecondaryAction(
                           icon: Icons.photo_camera_outlined,
                           label: 'Scan with camera',
-                          onTap: () => context.push('/sign-document/preview'),
+                          onTap: _busy ? () {} : _scanWithCamera,
                         ),
                       ),
                     ],
@@ -63,15 +181,22 @@ class SignUploadScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  ...recent.map(
-                    (doc) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _RecentDocTile(
-                        title: doc.title,
-                        onTap: () => context.push('/sign-document/preview'),
+                  if (recent.isEmpty)
+                    Text(
+                      'No recent documents yet',
+                      style: AppTextStyles.bodySmall,
+                    )
+                  else
+                    ...recent.map(
+                      (doc) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _RecentDocTile(
+                          title: doc.title,
+                          isPdf: doc.isPdf,
+                          onTap: () => _openRecent(doc),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -176,10 +301,15 @@ class _SecondaryAction extends StatelessWidget {
 }
 
 class _RecentDocTile extends StatelessWidget {
-  const _RecentDocTile({required this.title, required this.onTap});
+  const _RecentDocTile({
+    required this.title,
+    required this.onTap,
+    this.isPdf = true,
+  });
 
   final String title;
   final VoidCallback onTap;
+  final bool isPdf;
 
   @override
   Widget build(BuildContext context) {
@@ -201,8 +331,10 @@ class _RecentDocTile extends StatelessWidget {
                     color: AppColors.accentBlue.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: const Icon(
-                    Icons.picture_as_pdf_rounded,
+                  child: Icon(
+                    isPdf
+                        ? Icons.picture_as_pdf_rounded
+                        : Icons.image_outlined,
                     color: AppColors.accentBlue,
                     size: 18,
                   ),

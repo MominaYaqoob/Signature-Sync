@@ -215,7 +215,14 @@ enum PointType {
 /// one point on canvas represented by offset and type
 class Point {
   /// constructor
-  Point(this.offset, this.type, this.pressure);
+  Point(
+    this.offset,
+    this.type,
+    this.pressure, {
+    this.color,
+    this.strokeWidth,
+    this.strokeCap,
+  });
 
   /// x and y value on 2D canvas
   Offset offset;
@@ -225,6 +232,15 @@ class Point {
 
   /// type of user display finger movement
   PointType type;
+
+  /// Ink color captured when this point was drawn (enables multi-style / eraser).
+  Color? color;
+
+  /// Stroke width captured when this point was drawn.
+  double? strokeWidth;
+
+  /// Stroke cap captured when this point was drawn.
+  StrokeCap? strokeCap;
 }
 
 class _SignaturePainter extends CustomPainter {
@@ -239,30 +255,32 @@ class _SignaturePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, _) {
-    // Read style each paint so mutable penColor / penStrokeWidth / strokeCap apply.
-    _penStyle
-      ..color = _exportPenColor ?? _controller.penColor
-      ..strokeWidth = _controller.penStrokeWidth
-      ..strokeCap = _controller.strokeCap
-      ..strokeJoin = _controller.strokeJoin;
-
     final List<Point> points = _controller.value;
     if (points.isEmpty) {
       return;
     }
-    final double baseWidth = _controller.penStrokeWidth;
+
+    _penStyle.strokeJoin = _controller.strokeJoin;
+
     for (int i = 0; i < (points.length - 1); i++) {
-      final double width = baseWidth * points[i].pressure;
-      _penStyle.strokeWidth = width;
+      final Point point = points[i];
+      final double baseWidth =
+          point.strokeWidth ?? _controller.penStrokeWidth;
+      final double width = baseWidth * point.pressure;
+      _penStyle
+        ..color = _exportPenColor ?? point.color ?? _controller.penColor
+        ..strokeWidth = width
+        ..strokeCap = point.strokeCap ?? _controller.strokeCap;
+
       if (points[i + 1].type == PointType.move) {
         canvas.drawLine(
-          points[i].offset,
+          point.offset,
           points[i + 1].offset,
           _penStyle,
         );
       } else {
         canvas.drawCircle(
-          points[i].offset,
+          point.offset,
           width / 2,
           _penStyle,
         );
@@ -339,7 +357,16 @@ class SignatureController extends ValueNotifier<List<Point>> {
 
   /// add point to point collection
   void addPoint(Point point) {
-    value.add(point);
+    value.add(
+      Point(
+        point.offset,
+        point.type,
+        point.pressure,
+        color: point.color ?? penColor,
+        strokeWidth: point.strokeWidth ?? penStrokeWidth,
+        strokeCap: point.strokeCap ?? strokeCap,
+      ),
+    );
     notifyListeners();
   }
 

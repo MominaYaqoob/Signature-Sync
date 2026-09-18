@@ -41,6 +41,7 @@ class DocumentModel {
     this.pageCount = 1,
     this.signerName,
     this.fileType = DocumentFileType.pdf,
+    this.filePath,
   });
 
   @HiveField(0)
@@ -64,7 +65,35 @@ class DocumentModel {
   @HiveField(6)
   final DocumentFileType fileType;
 
+  /// Local path to the PDF/image file on device.
+  @HiveField(7)
+  final String? filePath;
+
   String get statusLabel => status.statusLabel;
 
   bool get isPdf => fileType == DocumentFileType.pdf;
+
+  bool get hasFile => filePath != null && filePath!.isNotEmpty;
+
+  DocumentModel copyWith({
+    String? id,
+    String? title,
+    DocumentStatus? status,
+    DateTime? updatedAt,
+    int? pageCount,
+    String? signerName,
+    DocumentFileType? fileType,
+    String? filePath,
+  }) {
+    return DocumentModel(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      status: status ?? this.status,
+      updatedAt: updatedAt ?? this.updatedAt,
+      pageCount: pageCount ?? this.pageCount,
+      signerName: signerName ?? this.signerName,
+      fileType: fileType ?? this.fileType,
+      filePath: filePath ?? this.filePath,
+    );
+  }
 }

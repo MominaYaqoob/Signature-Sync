@@ -193,6 +193,8 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
                       ? Image.file(
                           File(imagePath),
                           fit: BoxFit.contain,
+                          width: double.infinity,
+                          height: double.infinity,
                           filterQuality: FilterQuality.medium,
                         )
                       : Text(

@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Signature Sync needs camera access to scan your handwritten signature.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Signature Sync needs photo library access to import signature images.</string>
 </dict>
 </plist>

@@ -21,16 +21,17 @@ class DocumentModelAdapter extends TypeAdapter<DocumentModel> {
       title: fields[1] as String,
       status: fields[2] as DocumentStatus,
       updatedAt: fields[3] as DateTime,
-      pageCount: fields[4] as int,
+      pageCount: fields[4] as int? ?? 1,
       signerName: fields[5] as String?,
-      fileType: fields[6] as DocumentFileType,
+      fileType: fields[6] as DocumentFileType? ?? DocumentFileType.pdf,
+      filePath: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, DocumentModel obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -44,7 +45,9 @@ class DocumentModelAdapter extends TypeAdapter<DocumentModel> {
       ..writeByte(5)
       ..write(obj.signerName)
       ..writeByte(6)
-      ..write(obj.fileType);
+      ..write(obj.fileType)
+      ..writeByte(7)
+      ..write(obj.filePath);
   }
 
   @override

@@ -1,13 +1,168 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+
 import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
-class ScanSignatureScreen extends StatelessWidget {
+/// Paper pixels brighter than this (0–255 luminance) become transparent.
+const _paperBrightnessThreshold = 180;
+
+/// Pixels darker than this are treated as solid ink (fully opaque).
+const _inkBrightnessFloor = 110;
+
+/// Normalized ink color written onto kept strokes (dark navy).
+const _inkColor = AppColors.navy;
+
+class ScanSignatureScreen extends StatefulWidget {
   const ScanSignatureScreen({super.key});
 
+  @override
+  State<ScanSignatureScreen> createState() => _ScanSignatureScreenState();
+}
+
+class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
   static const _previewBg = Color(0xFF17181C);
+
+  bool _busy = false;
+
+  /// Removes light paper background; keeps dark ink with soft edge alpha.
+  Uint8List? _removePaperBackground(Uint8List bytes) {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return null;
+
+    final src = decoded.convert(numChannels: 4);
+    final inkR = (_inkColor.r * 255.0).round().clamp(0, 255);
+    final inkG = (_inkColor.g * 255.0).round().clamp(0, 255);
+    final inkB = (_inkColor.b * 255.0).round().clamp(0, 255);
+
+    final softRange =
+        (_paperBrightnessThreshold - _inkBrightnessFloor).clamp(1, 255);
+
+    for (var y = 0; y < src.height; y++) {
+      for (var x = 0; x < src.width; x++) {
+        final pixel = src.getPixel(x, y);
+        // Rec. 601 luminance
+        final luminance =
+            (0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b).round();
+
+        if (luminance > _paperBrightnessThreshold) {
+          src.setPixelRgba(x, y, 0, 0, 0, 0);
+          continue;
+        }
+
+        final int alpha;
+        if (luminance <= _inkBrightnessFloor) {
+          alpha = 255;
+        } else {
+          // Soft falloff between ink floor and paper threshold.
+          final t = (luminance - _inkBrightnessFloor) / softRange;
+          alpha = ((1.0 - t) * 255.0).round().clamp(0, 255);
+        }
+
+        src.setPixelRgba(x, y, inkR, inkG, inkB, alpha);
+      }
+    }
+
+    return Uint8List.fromList(img.encodePng(src));
+  }
+
+  Future<void> _captureAndCrop() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+
+    try {
+      final picker = ImagePicker();
+      final photo = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 90,
+      );
+      if (photo == null) return;
+      if (!mounted) return;
+
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: photo.path,
+        compressQuality: 92,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop signature',
+            toolbarColor: AppColors.navy,
+            toolbarWidgetColor: Colors.white,
+            statusBarColor: AppColors.navy,
+            activeControlsWidgetColor: AppColors.accentPurple,
+            backgroundColor: _previewBg,
+            cropFrameColor: AppColors.accentBlue,
+            cropGridColor: AppColors.accentBlue.withValues(alpha: 0.45),
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.ratio4x3,
+            ],
+          ),
+          IOSUiSettings(
+            title: 'Crop signature',
+            doneButtonTitle: 'Done',
+            cancelButtonTitle: 'Cancel',
+            aspectRatioLockEnabled: false,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.ratio4x3,
+            ],
+          ),
+        ],
+      );
+      if (cropped == null) return;
+      if (!mounted) return;
+
+      final croppedBytes = await File(cropped.path).readAsBytes();
+      final processed = _removePaperBackground(croppedBytes);
+      if (processed == null || processed.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not process scanned signature')),
+        );
+        return;
+      }
+
+      final id = 'sig_${DateTime.now().millisecondsSinceEpoch}';
+      final docs = await getApplicationDocumentsDirectory();
+      final signaturesDir = Directory('${docs.path}/signatures');
+      if (!await signaturesDir.exists()) {
+        await signaturesDir.create(recursive: true);
+      }
+      final dest = File('${signaturesDir.path}/$id.png');
+      await dest.writeAsBytes(processed, flush: true);
+
+      if (!mounted) return;
+      await context.push(
+        '/save-signature',
+        extra: <String, String>{
+          'name': '',
+          'style': 'Scanned',
+          'source': 'scan',
+          'imagePath': dest.path,
+          'id': id,
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not capture signature: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,16 +222,8 @@ class ScanSignatureScreen extends StatelessWidget {
                 ),
                 const Spacer(flex: 3),
                 _CaptureButton(
-                  onPressed: () {
-                    context.push(
-                      '/save-signature',
-                      extra: <String, String>{
-                        'name': 'Scanned signature',
-                        'style': 'Scanned',
-                        'source': 'scan',
-                      },
-                    );
-                  },
+                  busy: _busy,
+                  onPressed: _busy ? null : _captureAndCrop,
                 ),
                 const SizedBox(height: 36),
               ],
@@ -212,9 +359,13 @@ class _CornerBracketPainter extends CustomPainter {
 }
 
 class _CaptureButton extends StatelessWidget {
-  const _CaptureButton({required this.onPressed});
+  const _CaptureButton({
+    required this.onPressed,
+    this.busy = false,
+  });
 
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -233,11 +384,19 @@ class _CaptureButton extends StatelessWidget {
           ),
           boxShadow: AppShadows.elevated,
         ),
-        child: const Icon(
-          Icons.photo_camera_rounded,
-          color: AppColors.accentPurple,
-          size: 30,
-        ),
+        child: busy
+            ? const Padding(
+                padding: EdgeInsets.all(22),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  color: AppColors.accentPurple,
+                ),
+              )
+            : const Icon(
+                Icons.photo_camera_rounded,
+                color: AppColors.accentPurple,
+                size: 30,
+              ),
       ),
     );
   }
