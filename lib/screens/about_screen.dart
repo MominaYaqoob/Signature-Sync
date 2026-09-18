@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
 class AboutScreen extends StatelessWidget {
@@ -22,22 +23,10 @@ class AboutScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'About',
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 18),
-                    ),
-                  ),
-                ],
+              NavyAppHeader(
+                title: 'About',
+                onBack: () => context.pop(),
+                fontSize: 18,
               ),
               const Spacer(),
               Container(
@@ -52,7 +41,7 @@ class AboutScreen extends StatelessWidget {
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        gradient: AppColors.purpleGradient,
+                        gradient: AppColors.violetGradient,
                         borderRadius: BorderRadius.circular(AppRadii.md),
                         boxShadow: AppShadows.elevated,
                       ),

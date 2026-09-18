@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
 typedef _FontBuilder = TextStyle Function({
@@ -121,22 +122,10 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Auto Signature',
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 15),
-                    ),
-                  ),
-                ],
+              child: NavyAppHeader(
+                title: 'Auto Signature',
+                onBack: () => context.pop(),
+                fontSize: 15,
               ),
             ),
             Padding(

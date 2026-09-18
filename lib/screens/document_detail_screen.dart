@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/document_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
 
 /// Placeholder document preview / detail shell.
@@ -16,21 +17,24 @@ class DocumentDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final doc = document ?? DummyDocuments.byId(documentId);
+    final doc = document ?? StorageService.getDocumentById(documentId);
     final title = doc?.title ?? 'Document';
     final isPdf = doc?.isPdf ?? true;
-    final tint = isPdf ? AppColors.accentMintGreen : AppColors.accentPurple;
+    final tint = isPdf ? AppColors.accentBlue : AppColors.accentPurple;
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       appBar: AppBar(
+        backgroundColor: AppColors.navy,
+        foregroundColor: Colors.white,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.pop(),
         ),
         title: Text(
           title,
-          style: AppTextStyles.titleMedium,
+          style: AppTextStyles.titleMedium.copyWith(color: Colors.white),
         ),
         actions: [
           IconButton(
@@ -106,7 +110,7 @@ class DocumentDetailScreen extends StatelessWidget {
                   'Status: Signed',
                   style: AppTextStyles.bodyLarge.copyWith(
                     fontSize: 13,
-                    color: AppColors.accentMintGreen,
+                    color: AppColors.accentBlue,
                   ),
                 ),
               ),

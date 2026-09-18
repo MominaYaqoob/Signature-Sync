@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../theme/theme.dart';
-import '../widgets/accent_title.dart';
+import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
 typedef _FontBuilder = TextStyle Function({
@@ -35,8 +35,8 @@ final _templates = <_TemplateStyle>[
           fontSize: fontSize,
           color: color,
         ),
-    accent: AppColors.accentPink,
-    fill: AppColors.softPink,
+    accent: AppColors.accentPurple,
+    fill: AppColors.softPurple,
   ),
   _TemplateStyle(
     id: 'dancing',
@@ -65,8 +65,8 @@ final _templates = <_TemplateStyle>[
           fontSize: fontSize,
           color: color,
         ),
-    accent: AppColors.accentMintGreen,
-    fill: AppColors.softGreen,
+    accent: AppColors.accentBlue,
+    fill: AppColors.softBlue,
   ),
   _TemplateStyle(
     id: 'pacifico',
@@ -75,8 +75,8 @@ final _templates = <_TemplateStyle>[
           fontSize: fontSize,
           color: color,
         ),
-    accent: AppColors.accentOrange,
-    fill: AppColors.softOrange,
+    accent: AppColors.accentBlue,
+    fill: AppColors.softBlue,
   ),
   _TemplateStyle(
     id: 'great_vibes_alt',
@@ -110,23 +110,10 @@ class TemplatesScreen extends StatelessWidget {
                 AppSpacing.xl,
                 AppSpacing.xs,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: AccentTitle(
-                      title: 'Templates',
-                      accent: AppColors.accentMintGreen,
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
-                    ),
-                  ),
-                ],
+              child: NavyAppHeader(
+                title: 'Templates',
+                onBack: () => context.pop(),
+                fontSize: 22,
               ),
             ),
             Padding(

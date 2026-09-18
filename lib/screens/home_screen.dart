@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../models/document_model.dart';
-import '../models/signature_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
-import '../widgets/accent_title.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/signature_visual.dart';
 
 String _shortDate(DateTime d) {
   const months = [
@@ -23,43 +22,16 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static final _homeSignatures = <SignatureModel>[
-    SignatureModel(
-      id: 'sig_aliza',
-      name: 'Aliza',
-      style: SignatureStyle.drawn,
-      createdAt: DateTime(2026, 9, 1),
-      isDefault: true,
-    ),
-    SignatureModel(
-      id: 'sig_yaqoob',
-      name: 'M. Yaqoob',
-      style: SignatureStyle.typed,
-      createdAt: DateTime(2026, 9, 3),
-    ),
-  ];
-
-  static final _homeDocuments = <DocumentModel>[
-    DocumentModel(
-      id: 'doc_rent',
-      title: 'Rent agreement.pdf',
-      status: DocumentStatus.signed,
-      updatedAt: DateTime(2026, 9, 10),
-    ),
-    DocumentModel(
-      id: 'doc_offer',
-      title: 'Offer letter.pdf',
-      status: DocumentStatus.signed,
-      updatedAt: DateTime(2026, 9, 8),
-    ),
-  ];
-
   Future<void> _onRefresh() async {
     await Future<void>.delayed(const Duration(milliseconds: 700));
+    if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final homeSignatures = StorageService.getAllSignatures();
+    final homeDocuments = StorageService.getAllDocuments();
+
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       body: RefreshIndicator(
@@ -72,29 +44,29 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           slivers: [
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.sm,
-                  AppSpacing.xl,
-                  0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _HomeHeader(
-                      onSettings: () => context.go('/settings'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: AppSpacing.lg),
+                  _HomeHeader(
+                    onSettings: () => context.go('/settings'),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.lg,
+                      AppSpacing.xl,
+                      0,
                     ),
-                    const SizedBox(height: AppSpacing.lg),
-                    const _QuickActionsGrid(),
-                    const SizedBox(height: AppSpacing.xl + AppSpacing.xs),
-                    _SectionTitle(
-                      title: 'My signatures',
-                      onSeeAll: () => context.go('/signatures'),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                  ],
-                ),
+                    child: const _QuickActionsGrid(),
+                  ),
+                  const SizedBox(height: AppSpacing.xl + AppSpacing.xs),
+                  _SectionTitle(
+                    title: 'My signatures',
+                    onSeeAll: () => context.go('/signatures'),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
               ),
             ),
             SliverToBoxAdapter(
@@ -110,19 +82,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     AppSpacing.xl,
                     AppSpacing.xs,
                   ),
-                  itemCount: _homeSignatures.length + 1,
+                  itemCount: homeSignatures.length + 1,
                   separatorBuilder: (_, _) =>
                       const SizedBox(width: AppSpacing.sm),
                   itemBuilder: (context, index) {
-                    if (index == _homeSignatures.length) {
+                    if (index == homeSignatures.length) {
                       return const _AddSignatureCard();
                     }
-                    final sig = _homeSignatures[index];
+                    final sig = homeSignatures[index];
                     final color = index.isEven
-                        ? AppColors.accentPink
-                        : AppColors.accentOrange;
+                        ? AppColors.accentPurple
+                        : AppColors.accentBlue;
                     return _SignaturePreviewCard(
                       name: sig.name,
+                      imagePath: sig.imagePath,
                       color: color,
                     );
                   },
@@ -131,26 +104,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.xl + AppSpacing.xs,
-                  AppSpacing.xl,
-                  AppSpacing.sm,
+                padding: const EdgeInsets.only(
+                  top: AppSpacing.xl + AppSpacing.xs,
+                  bottom: AppSpacing.sm,
                 ),
                 child: _SectionTitle(
                   title: 'Recent documents',
                   onSeeAll: () => context.go('/documents'),
+                  blue: true,
                 ),
               ),
             ),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
               sliver: SliverList.separated(
-                itemCount: _homeDocuments.length,
+                itemCount: homeDocuments.length,
                 separatorBuilder: (_, _) =>
                     const SizedBox(height: AppSpacing.sm),
                 itemBuilder: (context, index) {
-                  final doc = _homeDocuments[index];
+                  final doc = homeDocuments[index];
                   return _DocumentCard(
                     title: doc.title,
                     subtitle: 'Signed · ${_shortDate(doc.updatedAt)}',
@@ -178,61 +150,127 @@ class _HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: AccentTitle(
-            title: 'Sign smart',
-            subtitle: 'Welcome back',
-            accent: AppColors.accentPink,
-            style: AppTextStyles.titleLarge.copyWith(
-              fontSize: 24,
-              height: 1.2,
+    return Container(
+      width: double.infinity,
+      padding: AppSpacing.cardPadding,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Color(0xFF243556),
+            AppColors.navy,
+          ],
+        ),
+        borderRadius: BorderRadius.all(Radius.circular(AppRadii.md)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Welcome back',
+                  style: AppTextStyles.eyebrow.copyWith(
+                    color: AppColors.navyMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Sign smart',
+                  style: AppTextStyles.titleLarge.copyWith(
+                    fontSize: 24,
+                    height: 1.2,
+                    color: AppColors.textOnAccent,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-        const SizedBox(width: 10),
-        PressableScale(
-          onTap: onSettings,
-          borderRadius: BorderRadius.circular(999),
-          child: Material(
-            color: AppColors.primaryBackground,
-            shape: const CircleBorder(
-              side: BorderSide(color: AppColors.accentPurple, width: 1.4),
-            ),
-            elevation: 0,
-            child: const SizedBox(
-              width: 44,
-              height: 44,
+          PressableScale(
+            onTap: onSettings,
+            borderRadius: BorderRadius.circular(999),
+            child: const Padding(
+              padding: EdgeInsets.all(4),
               child: Icon(
                 Icons.settings_rounded,
-                color: AppColors.accentPurple,
+                color: AppColors.textOnAccent,
                 size: 22,
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
 class _SectionTitle extends StatelessWidget {
-  const _SectionTitle({required this.title, required this.onSeeAll});
+  const _SectionTitle({
+    required this.title,
+    required this.onSeeAll,
+    this.blue = false,
+  });
 
   final String title;
   final VoidCallback onSeeAll;
+  final bool blue;
 
   @override
   Widget build(BuildContext context) {
-    return AccentSectionHeader(
-      title: title,
-      actionLabel: 'See all',
-      onAction: onSeeAll,
-      accent: title.toLowerCase().contains('document')
-          ? AppColors.accentBlue
-          : AppColors.accentPurple,
+    final colors = blue
+        ? const [Color(0xFF4CA1FF), AppColors.accentBlue]
+        : const [Color(0xFF243556), AppColors.navy];
+    final actionColor = blue
+        ? Colors.white.withValues(alpha: 0.85)
+        : AppColors.navyMuted;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: colors,
+        ),
+        borderRadius: const BorderRadius.all(Radius.circular(AppRadii.md)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: AppTextStyles.titleMedium.copyWith(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textOnAccent,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onSeeAll,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.xs,
+                vertical: AppSpacing.xs,
+              ),
+              child: Text(
+                'See all',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: actionColor,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -254,30 +292,31 @@ class _QuickAction {
 class _QuickActionsGrid extends StatelessWidget {
   const _QuickActionsGrid();
 
+  // Alternate purple → blue → purple → blue (mixed, no two same in a row).
   static const _actions = <_QuickAction>[
     _QuickAction(
       label: 'Draw',
       icon: Icons.draw_rounded,
-      gradient: AppColors.pinkGradient,
-      shadowColor: AppColors.accentPink,
+      gradient: AppColors.violetGradient,
+      shadowColor: AppColors.accentPurple,
     ),
     _QuickAction(
       label: 'Scan',
       icon: Icons.photo_camera_outlined,
-      gradient: AppColors.orangeGradient,
-      shadowColor: AppColors.accentOrange,
-    ),
-    _QuickAction(
-      label: 'Auto',
-      icon: Icons.auto_awesome_rounded,
       gradient: AppColors.blueGradient,
       shadowColor: AppColors.accentBlue,
     ),
     _QuickAction(
+      label: 'Auto',
+      icon: Icons.auto_awesome_rounded,
+      gradient: AppColors.violetGradient,
+      shadowColor: AppColors.accentPurple,
+    ),
+    _QuickAction(
       label: 'Templates',
       icon: Icons.grid_view_rounded,
-      gradient: AppColors.greenGradient,
-      shadowColor: AppColors.accentMintGreen,
+      gradient: AppColors.blueGradient,
+      shadowColor: AppColors.accentBlue,
     ),
     _QuickAction(
       label: 'Sign doc',
@@ -288,8 +327,8 @@ class _QuickActionsGrid extends StatelessWidget {
     _QuickAction(
       label: 'Share',
       icon: Icons.send_rounded,
-      gradient: AppColors.purpleGradient,
-      shadowColor: AppColors.accentPink,
+      gradient: AppColors.blueGradient,
+      shadowColor: AppColors.accentBlue,
     ),
   ];
 
@@ -448,9 +487,11 @@ class _SignaturePreviewCard extends StatelessWidget {
   const _SignaturePreviewCard({
     required this.name,
     required this.color,
+    this.imagePath,
   });
 
   final String name;
+  final String? imagePath;
   final Color color;
 
   @override
@@ -462,20 +503,18 @@ class _SignaturePreviewCard extends StatelessWidget {
         vertical: AppSpacing.lg,
       ),
       decoration: AppDecorations.card(
-        color: color == AppColors.accentPink
-            ? AppColors.softPink
-            : AppColors.softOrange,
+        color: color == AppColors.accentBlue
+            ? AppColors.softBlue
+            : AppColors.softPurple,
         radius: AppRadii.md,
         prominent: true,
         borderColor: color.withValues(alpha: 0.28),
       ),
       child: Center(
-        child: Text(
-          name,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.signaturePreview(color: color),
+        child: SignatureVisual(
+          name: name,
+          imagePath: imagePath,
+          color: color,
         ),
       ),
     );
@@ -641,7 +680,7 @@ class _DocumentCard extends StatelessWidget {
                 Text(
                   subtitle,
                   style: AppTextStyles.labelMedium.copyWith(
-                    color: AppColors.accentMintGreen,
+                    color: AppColors.accentBlue,
                   ),
                 ),
               ],

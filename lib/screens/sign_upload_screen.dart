@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../models/document_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 
 /// SCREEN A — Upload Document
 class SignUploadScreen extends StatelessWidget {
   const SignUploadScreen({super.key});
 
-  static final _recent = DummyDocuments.seed();
-
   @override
   Widget build(BuildContext context) {
+    final recent = StorageService.getAllDocuments();
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       body: SafeArea(
@@ -19,22 +19,10 @@ class SignUploadScreen extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Sign Document',
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 15),
-                    ),
-                  ),
-                ],
+              child: NavyAppHeader(
+                title: 'Sign Document',
+                onBack: () => context.pop(),
+                fontSize: 15,
               ),
             ),
             Expanded(
@@ -75,7 +63,7 @@ class SignUploadScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  ..._recent.map(
+                  ...recent.map(
                     (doc) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _RecentDocTile(
@@ -172,7 +160,7 @@ class _SecondaryAction extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
           child: Column(
             children: [
-              Icon(icon, color: AppColors.accentMintGreen, size: 22),
+              Icon(icon, color: AppColors.accentBlue, size: 22),
               const SizedBox(height: 8),
               Text(
                 label,
@@ -210,12 +198,12 @@ class _RecentDocTile extends StatelessWidget {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.accentMintGreen.withValues(alpha: 0.16),
+                    color: AppColors.accentBlue.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: const Icon(
                     Icons.picture_as_pdf_rounded,
-                    color: AppColors.accentMintGreen,
+                    color: AppColors.accentBlue,
                     size: 18,
                   ),
                 ),

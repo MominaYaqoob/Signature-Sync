@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/document_model.dart';
+import '../models/signature_model.dart';
+import '../services/storage_service.dart';
 import '../screens/auto_signature_screen.dart';
 import '../screens/document_detail_screen.dart';
 import '../screens/documents_screen.dart';
@@ -23,7 +25,6 @@ import '../screens/quick_share_screen.dart';
 import '../screens/signature_detail_screen.dart';
 import '../screens/privacy_policy_screen.dart';
 import '../screens/about_screen.dart';
-import '../models/signature_model.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -76,15 +77,21 @@ GoRouter createAppRouter() {
           String? name;
           String? style;
           String? source;
+          String? imagePath;
+          String? id;
           if (extra is Map) {
             name = extra['name'] as String?;
             style = extra['style'] as String?;
             source = extra['source'] as String?;
+            imagePath = extra['imagePath'] as String?;
+            id = extra['id'] as String?;
           }
           return SaveSignatureScreen(
             initialName: name,
             styleLabel: style,
             source: source,
+            imagePath: imagePath,
+            id: id,
           );
         },
       ),
@@ -122,9 +129,21 @@ GoRouter createAppRouter() {
         parentNavigatorKey: _rootNavigatorKey,
         builder: (context, state) {
           final extra = state.extra;
-          final signature = extra is SignatureModel
-              ? extra
-              : DummySignatures.seed().first;
+          SignatureModel? signature;
+          if (extra is SignatureModel) {
+            signature = extra;
+          } else {
+            signature = StorageService.getDefaultSignature();
+            if (signature == null) {
+              final all = StorageService.getAllSignatures();
+              if (all.isNotEmpty) signature = all.first;
+            }
+          }
+          if (signature == null) {
+            return const Scaffold(
+              body: Center(child: Text('Signature not found')),
+            );
+          }
           return SignatureDetailScreen(signature: signature);
         },
       ),

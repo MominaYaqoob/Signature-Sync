@@ -4,15 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'router/app_router.dart';
+import 'services/storage_service.dart';
 import 'theme/theme.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await StorageService.init();
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: AppColors.accentPurple,
+      systemNavigationBarColor: AppColors.navy,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );

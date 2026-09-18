@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
 import '../widgets/pressable_scale.dart';
@@ -61,6 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true && mounted) {
+      await StorageService.clearAll();
       _toast('All local data cleared');
     }
   }
@@ -70,19 +72,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          AppSpacing.sm,
-          AppSpacing.xl,
-          AppSpacing.xl,
-        ),
+        padding: EdgeInsets.zero,
         children: [
-          AccentTitle(
-            title: 'Settings',
-            accent: AppColors.accentPink,
-            style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
+          Padding(
+            padding: const EdgeInsets.only(
+              top: AppSpacing.lg,
+              bottom: AppSpacing.lg,
+            ),
+            child: AccentTitle(
+              title: 'Settings',
+              accent: AppColors.navy,
+              style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.xl,
+              0,
+              AppSpacing.xl,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              children: [
           _SettingsCard(
               child: _SettingsRow(
                 icon: Icons.dark_mode_outlined,
@@ -90,7 +101,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 trailing: Switch.adaptive(
                   value: _darkMode,
                   activeThumbColor: AppColors.textOnAccent,
-                  activeTrackColor: AppColors.accentMintGreen,
+                  activeTrackColor: AppColors.accentBlue,
                   inactiveThumbColor: AppColors.textSecondary,
                   inactiveTrackColor: AppColors.altCardBackground,
                   onChanged: (value) {
@@ -165,8 +176,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

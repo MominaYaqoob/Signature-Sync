@@ -3,7 +3,9 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/signature_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 
 /// SCREEN C — Place Signature
 class SignPlaceScreen extends StatefulWidget {
@@ -14,7 +16,7 @@ class SignPlaceScreen extends StatefulWidget {
 }
 
 class _SignPlaceScreenState extends State<SignPlaceScreen> {
-  final _signatures = DummySignatures.seed();
+  late List<SignatureModel> _signatures;
   int _selectedSig = 0;
 
   Offset _position = const Offset(40, 320);
@@ -24,7 +26,14 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
   static const _minSize = Size(100, 44);
   static const _maxSize = Size(260, 110);
 
-  String get _name => _signatures[_selectedSig].name;
+  @override
+  void initState() {
+    super.initState();
+    _signatures = StorageService.getAllSignatures();
+  }
+
+  String get _name =>
+      _signatures.isEmpty ? 'Signature' : _signatures[_selectedSig].name;
 
   Future<void> _pickSignature() async {
     final index = await showModalBottomSheet<int>(
@@ -64,7 +73,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
                       style: AppTextStyles.signaturePreview(
                         color: selected
                             ? AppColors.accentPurple
-                            : AppColors.accentMintGreen,
+                            : AppColors.accentBlue,
                       ),
                     ),
                     trailing: selected
@@ -108,43 +117,31 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 12, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Place Signature',
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 15),
-                    ),
-                  ),
-                  Material(
-                    color: AppColors.accentMintGreen,
+              child: NavyAppHeader(
+                title: 'Place Signature',
+                onBack: () => context.pop(),
+                fontSize: 15,
+                trailing: Material(
+                  color: AppColors.accentBlue,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    onTap: () => context.push('/sign-document/success'),
                     borderRadius: BorderRadius.circular(10),
-                    child: InkWell(
-                      onTap: () => context.push('/sign-document/success'),
-                      borderRadius: BorderRadius.circular(10),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        child: Text(
-                          'Apply',
-                          style: AppTextStyles.onAccentLabel.copyWith(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        'Apply',
+                        style: AppTextStyles.onAccentLabel.copyWith(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
             Expanded(
@@ -338,7 +335,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
             width: handleSize,
             height: handleSize,
             decoration: BoxDecoration(
-              color: AppColors.accentMintGreen,
+              color: AppColors.accentBlue,
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 1.5),
               boxShadow: [

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
@@ -21,22 +22,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 AppSpacing.xl,
                 AppSpacing.xs,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Privacy Policy',
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 18),
-                    ),
-                  ),
-                ],
+              child: NavyAppHeader(
+                title: 'Privacy Policy',
+                onBack: () => context.pop(),
+                fontSize: 18,
               ),
             ),
             Expanded(

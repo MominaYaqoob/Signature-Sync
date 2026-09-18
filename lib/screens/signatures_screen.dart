@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/signature_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/signature_visual.dart';
 
 class SignaturesScreen extends StatefulWidget {
   const SignaturesScreen({super.key});
@@ -13,12 +15,13 @@ class SignaturesScreen extends StatefulWidget {
 }
 
 class _SignaturesScreenState extends State<SignaturesScreen> {
-  late List<SignatureModel> _signatures;
-
   @override
   void initState() {
     super.initState();
-    _signatures = List<SignatureModel>.from(DummySignatures.seed());
+  }
+
+  void _reload() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _showCreateSheet() async {
@@ -30,12 +33,13 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
       ),
       builder: (context) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, AppSpacing.sm, 20, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, AppSpacing.sm, 20, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                 Center(
                   child: Container(
                     width: 40,
@@ -64,7 +68,9 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
                   color: AppColors.accentPurple,
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/draw-signature');
+                    context.push('/draw-signature').then((_) {
+                      if (mounted) _reload();
+                    });
                   },
                 ),
                 const SizedBox(height: 10),
@@ -72,10 +78,12 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
                   icon: Icons.photo_camera_outlined,
                   label: 'Scan',
                   subtitle: 'Capture with the camera',
-                  color: AppColors.accentMintGreen,
+                  color: AppColors.accentBlue,
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/scan-signature');
+                    context.push('/scan-signature').then((_) {
+                      if (mounted) _reload();
+                    });
                   },
                 ),
                 const SizedBox(height: 10),
@@ -86,15 +94,19 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
                   color: AppColors.accentPurple,
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/auto-signature');
+                    context.push('/auto-signature').then((_) {
+                      if (mounted) _reload();
+                    });
                   },
                 ),
               ],
             ),
           ),
+        ),
         );
       },
     );
+    if (mounted) _reload();
   }
 
   void _toast(String message) {
@@ -103,12 +115,9 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
     );
   }
 
-  void _setDefault(String id) {
-    setState(() {
-      _signatures = _signatures
-          .map((s) => s.copyWith(isDefault: s.id == id))
-          .toList();
-    });
+  Future<void> _setDefault(String id) async {
+    await StorageService.setDefaultSignature(id);
+    _reload();
     _toast('Set as default');
   }
 
@@ -145,7 +154,7 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
               child: Text(
                 'Save',
                 style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.accentMintGreen,
+                  color: AppColors.accentBlue,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -156,21 +165,54 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
     );
 
     if (result == null || result.isEmpty) return;
-    setState(() {
-      _signatures = _signatures
-          .map((s) => s.id == signature.id ? s.copyWith(name: result) : s)
-          .toList();
-    });
+    await StorageService.saveSignature(signature.copyWith(name: result));
+    if (mounted) _reload();
   }
 
-  void _delete(SignatureModel signature) {
-    setState(() {
-      _signatures = _signatures.where((s) => s.id != signature.id).toList();
-      if (_signatures.isNotEmpty && !_signatures.any((s) => s.isDefault)) {
-        _signatures[0] = _signatures[0].copyWith(isDefault: true);
-      }
-    });
-    _toast('Signature deleted');
+  Future<void> _confirmDelete(SignatureModel signature) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppColors.cardBackground,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.md),
+          ),
+          title: Text(
+            'Delete signature?',
+            style: AppTextStyles.titleMedium,
+          ),
+          content: Text(
+            'Remove “${signature.name}” from this device. This can’t be undone.',
+            style: AppTextStyles.secondary.copyWith(fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: AppTextStyles.secondary,
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Delete',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: AppColors.danger,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true && mounted) {
+      await StorageService.deleteSignature(signature.id);
+      _reload();
+      _toast('Signature deleted');
+    }
   }
 
   Future<void> _openMenu(SignatureModel signature) async {
@@ -190,7 +232,7 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
                 ListTile(
                   leading: const Icon(
                     Icons.star_outline_rounded,
-                    color: AppColors.accentMintGreen,
+                    color: AppColors.accentBlue,
                   ),
                   title: Text(
                     'Set as default',
@@ -232,17 +274,18 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
     if (!mounted || action == null) return;
     switch (action) {
       case 'default':
-        _setDefault(signature.id);
+        await _setDefault(signature.id);
       case 'rename':
         await _rename(signature);
       case 'delete':
-        _delete(signature);
+        await _confirmDelete(signature);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final isEmpty = _signatures.isEmpty;
+    final signatures = StorageService.getAllSignatures();
+    final isEmpty = signatures.isEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
@@ -250,15 +293,13 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.sm,
-              AppSpacing.xl,
-              AppSpacing.sm,
+            padding: const EdgeInsets.only(
+              top: AppSpacing.lg,
+              bottom: AppSpacing.md,
             ),
             child: AccentTitle(
               title: 'My Signatures',
-              accent: AppColors.accentPurple,
+              accent: AppColors.navy,
               style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
             ),
           ),
@@ -272,31 +313,35 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
                       AppSpacing.xl,
                       AppSpacing.xl,
                     ),
-                    itemCount: _signatures.length + 2,
+                    itemCount: signatures.length + 2,
                     separatorBuilder: (_, _) =>
                         const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, index) {
-                      if (index == _signatures.length) {
+                      if (index == signatures.length) {
                         return _NewSignatureCard(onTap: _showCreateSheet);
                       }
-                      if (index == _signatures.length + 1) {
+                      if (index == signatures.length + 1) {
                         return const _ListFooterHint(
                           icon: Icons.auto_awesome_outlined,
                           message:
                               'Tip: set a default signature for faster signing.',
                         );
                       }
-                      final signature = _signatures[index];
+                      final signature = signatures[index];
                       final color = index.isEven
                           ? AppColors.accentPurple
-                          : AppColors.accentMintGreen;
+                          : AppColors.accentBlue;
                       return _SignatureCard(
                         signature: signature,
                         color: color,
-                        onTap: () => context.push(
+                        onTap: () => context
+                            .push(
                           '/signature-detail',
                           extra: signature,
-                        ),
+                        )
+                            .then((_) {
+                          if (mounted) _reload();
+                        }),
                         onMenu: () => _openMenu(signature),
                       );
                     },
@@ -339,15 +384,24 @@ class _SignatureCard extends StatelessWidget {
               child: Row(
                 children: [
                   Flexible(
-                    child: Text(
-                      signature.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.signaturePreview(
-                        color: color,
-                        size: 30,
-                      ),
-                    ),
+                    child: signature.hasImage
+                        ? SizedBox(
+                            height: 36,
+                            child: SignatureVisual.fromModel(
+                              signature,
+                              color: color,
+                              fontSize: 30,
+                            ),
+                          )
+                        : Text(
+                            signature.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.signaturePreview(
+                              color: color,
+                              size: 30,
+                            ),
+                          ),
                   ),
                   if (signature.isDefault) ...[
                     const SizedBox(width: 10),
@@ -358,7 +412,7 @@ class _SignatureCard extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color:
-                            AppColors.accentMintGreen.withValues(alpha: 0.16),
+                            AppColors.accentBlue.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -366,7 +420,7 @@ class _SignatureCard extends StatelessWidget {
                         style: AppTextStyles.labelMedium.copyWith(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.accentMintGreen,
+                          color: AppColors.accentBlue,
                         ),
                       ),
                     ),

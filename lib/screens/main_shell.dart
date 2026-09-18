@@ -11,7 +11,6 @@ class MainShell extends StatelessWidget {
 
   /// Single radius for the whole phone frame — avoids nested corner mismatch.
   static const double _frameRadius = 28;
-  static const double _navPillRadius = 22;
 
   void _onTap(int index) {
     navigationShell.goBranch(
@@ -26,10 +25,10 @@ class MainShell extends StatelessWidget {
     final bottomGap = padding.bottom + 18;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: DecoratedBox(
-        // Full-bleed backdrop (same family, slightly softer so frame edge is clean)
-        decoration: const BoxDecoration(gradient: AppColors.shellGradient),
+      backgroundColor: AppColors.primaryBackground,
+      body: ColoredBox(
+        // White outer board — clean professional frame (no pink shell).
+        color: AppColors.primaryBackground,
         child: Padding(
           padding: EdgeInsets.fromLTRB(
             10,
@@ -37,16 +36,27 @@ class MainShell extends StatelessWidget {
             10,
             bottomGap,
           ),
-          // Rounded frame (top + bottom). Soft AA to avoid jagged pink/white edge.
           child: Material(
-            color: Colors.transparent,
+            color: AppColors.primaryBackground,
             elevation: 0,
             shadowColor: Colors.transparent,
             borderRadius: BorderRadius.circular(_frameRadius),
             clipBehavior: Clip.antiAliasWithSaveLayer,
             child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: AppColors.shellGradient,
+              decoration: BoxDecoration(
+                color: AppColors.primaryBackground,
+                borderRadius: BorderRadius.circular(_frameRadius),
+                border: Border.all(
+                  color: AppColors.borderSoft.withValues(alpha: 0.9),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accentPurple.withValues(alpha: 0.08),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
@@ -56,7 +66,6 @@ class MainShell extends StatelessWidget {
                       removeTop: true,
                       removeBottom: true,
                       child: ClipRRect(
-                        // Slightly tighter than frame so layers don't fight at corners
                         borderRadius: const BorderRadius.vertical(
                           bottom: Radius.circular(22),
                         ),
@@ -73,29 +82,39 @@ class MainShell extends StatelessWidget {
                     child: MediaQuery.removePadding(
                       context: context,
                       removeBottom: true,
-                      child: SafeArea(
-                        top: false,
-                        bottom: true,
-                        minimum: const EdgeInsets.only(bottom: 8),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-                          child: Row(
-                            children: [
-                              for (var i = 0; i < _tabs.length; i++) ...[
-                                if (i > 0) const SizedBox(width: 6),
-                                Expanded(
-                                  child: _NavPillButton(
-                                    label: _tabs[i].label,
-                                    icon: _tabs[i].icon,
-                                    selectedIcon: _tabs[i].selectedIcon,
-                                    selected:
-                                        navigationShell.currentIndex == i,
-                                    radius: _navPillRadius,
-                                    onTap: () => _onTap(i),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: AppColors.primaryBackground,
+                          border: Border(
+                            top: BorderSide(
+                              color: AppColors.borderSoft,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                        child: SafeArea(
+                          top: false,
+                          bottom: true,
+                          minimum: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+                            child: Row(
+                              children: [
+                                for (var i = 0; i < _tabs.length; i++) ...[
+                                  if (i > 0) const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _NavPillButton(
+                                      label: _tabs[i].label,
+                                      icon: _tabs[i].icon,
+                                      selectedIcon: _tabs[i].selectedIcon,
+                                      selected:
+                                          navigationShell.currentIndex == i,
+                                      onTap: () => _onTap(i),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
                         ),
                       ),
@@ -146,14 +165,13 @@ const _tabs = <_NavTab>[
   ),
 ];
 
-/// Option B: active = gradient pill + white icon; inactive = plain.
+/// White tab bar: rounded bordered pills + top partition.
 class _NavPillButton extends StatelessWidget {
   const _NavPillButton({
     required this.label,
     required this.icon,
     required this.selectedIcon,
     required this.selected,
-    required this.radius,
     required this.onTap,
   });
 
@@ -161,62 +179,53 @@ class _NavPillButton extends StatelessWidget {
   final IconData icon;
   final IconData selectedIcon;
   final bool selected;
-  final double radius;
   final VoidCallback onTap;
+
+  static const Color _active = AppColors.navy;
+  static const Color _inactive = Color(0xFF9AA3AF);
 
   @override
   Widget build(BuildContext context) {
+    final color = selected ? _active : _inactive;
+
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedScale(
-        scale: selected ? 1.06 : 1.0,
-        duration: const Duration(milliseconds: 200),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
-          decoration: BoxDecoration(
-            gradient: selected ? AppColors.purpleGradient : null,
-            color: selected ? null : Colors.transparent,
-            borderRadius: BorderRadius.circular(radius),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.22),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ]
-                : null,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+        decoration: BoxDecoration(
+          color: selected
+              ? _active.withValues(alpha: 0.08)
+              : AppColors.primaryBackground,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected ? _active : AppColors.borderSoft,
+            width: selected ? 1.4 : 1.2,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                selected ? selectedIcon : icon,
-                color: selected
-                    ? AppColors.textOnAccent
-                    : Colors.white.withValues(alpha: 0.78),
-                size: selected ? 23 : 21,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? selectedIcon : icon,
+              color: color,
+              size: selected ? 24 : 22,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: AppTextStyles.labelMedium.copyWith(
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                color: color,
               ),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: AppTextStyles.labelMedium.copyWith(
-                  fontSize: selected ? 10.5 : 10,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected
-                      ? AppColors.textOnAccent
-                      : Colors.white.withValues(alpha: 0.78),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

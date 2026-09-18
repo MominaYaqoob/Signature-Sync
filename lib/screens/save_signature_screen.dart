@@ -1,7 +1,12 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../models/signature_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
 class SaveSignatureScreen extends StatefulWidget {
@@ -10,11 +15,15 @@ class SaveSignatureScreen extends StatefulWidget {
     this.initialName,
     this.styleLabel,
     this.source,
+    this.imagePath,
+    this.id,
   });
 
   final String? initialName;
   final String? styleLabel;
   final String? source;
+  final String? imagePath;
+  final String? id;
 
   @override
   State<SaveSignatureScreen> createState() => _SaveSignatureScreenState();
@@ -26,9 +35,9 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(
-      text: widget.initialName ?? 'Momina Yaqoob',
-    );
+    // Label field starts empty (or with a pre-filled label if one was passed).
+    // Auto/template "name" is signature text for the preview, not the label.
+    _nameController = TextEditingController();
   }
 
   @override
@@ -37,15 +46,93 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
     super.dispose();
   }
 
-  void _save() {
-    final name = _nameController.text.trim();
-    if (name.isEmpty) {
+  Map<String, String> _readData() {
+    final data = GoRouterState.of(context).extra as Map<String, String>? ?? {};
+    if (data.isNotEmpty) return data;
+
+    // Fallback if extras were only forwarded via constructor.
+    return <String, String>{
+      if (widget.initialName != null) 'name': widget.initialName!,
+      if (widget.styleLabel != null) 'style': widget.styleLabel!,
+      if (widget.source != null) 'source': widget.source!,
+      if (widget.imagePath != null) 'imagePath': widget.imagePath!,
+      if (widget.id != null) 'id': widget.id!,
+    };
+  }
+
+  SignatureStyle _parseStyle(Map<String, String> data) {
+    final style = (data['style'] ?? '').toLowerCase();
+    final source = (data['source'] ?? '').toLowerCase();
+    final combined = '$style $source';
+
+    if (combined.contains('scan')) return SignatureStyle.scanned;
+    if (combined.contains('upload')) return SignatureStyle.uploaded;
+    if (combined.contains('type') ||
+        combined.contains('auto') ||
+        combined.contains('template')) {
+      return SignatureStyle.typed;
+    }
+    if (combined.contains('drawn') || combined.contains('draw')) {
+      return SignatureStyle.drawn;
+    }
+    // Fancy template/auto style labels without an explicit source still count as typed.
+    if (style.isNotEmpty &&
+        style != 'drawn' &&
+        style != 'scanned' &&
+        style != 'uploaded') {
+      return SignatureStyle.typed;
+    }
+    return SignatureStyle.drawn;
+  }
+
+  bool _hasValidPayload(Map<String, String> data) {
+    final imagePath = data['imagePath'] ?? '';
+    if (imagePath.isNotEmpty) return true;
+
+    final name = data['name'] ?? '';
+    final style = data['style'] ?? '';
+    final source = data['source'] ?? '';
+    return name.isNotEmpty || style.isNotEmpty || source.isNotEmpty;
+  }
+
+  String _defaultLabel() {
+    final count = StorageService.getAllSignatures().length + 1;
+    return 'Signature $count';
+  }
+
+  Future<void> _save() async {
+    final data = _readData();
+
+    if (!_hasValidPayload(data)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a signature name')),
+        const SnackBar(content: Text('Nothing to save — go back and create a signature')),
       );
       return;
     }
 
+    final typedName = _nameController.text.trim();
+    final name = typedName.isEmpty ? _defaultLabel() : typedName;
+
+    final imagePathRaw = data['imagePath'] ?? '';
+    final imagePath = imagePathRaw.isEmpty ? null : imagePathRaw;
+
+    final idRaw = data['id'] ?? '';
+    final id = idRaw.isNotEmpty
+        ? idRaw
+        : 'sig_${DateTime.now().millisecondsSinceEpoch}';
+
+    final existing = StorageService.getAllSignatures();
+    final signature = SignatureModel(
+      id: id,
+      name: name,
+      style: _parseStyle(data),
+      createdAt: DateTime.now(),
+      isDefault: existing.isEmpty,
+      imagePath: imagePath,
+    );
+    await StorageService.saveSignature(signature);
+
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('“$name” saved')),
     );
@@ -54,8 +141,24 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final style = widget.styleLabel ?? 'Custom';
-    final source = widget.source ?? 'drawn';
+    final data = _readData();
+    final style = data['style']?.isNotEmpty == true
+        ? data['style']!
+        : (widget.styleLabel ?? 'Custom');
+    final source = data['source']?.isNotEmpty == true
+        ? data['source']!
+        : (widget.source ?? 'drawn');
+
+    final imagePath = data['imagePath'] ?? '';
+    final hasImage = imagePath.isNotEmpty && File(imagePath).existsSync();
+
+    // Auto/template cursive preview uses the incoming signature name, not the label field.
+    final previewName = () {
+      final fromData = (data['name'] ?? '').trim();
+      if (fromData.isNotEmpty) return fromData;
+      final fromField = _nameController.text.trim();
+      return fromField.isEmpty ? 'Your name' : fromField;
+    }();
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
@@ -70,22 +173,10 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Save Signature',
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 18),
-                    ),
-                  ),
-                ],
+              NavyAppHeader(
+                title: 'Save Signature',
+                onBack: () => context.pop(),
+                fontSize: 18,
               ),
               const SizedBox(height: AppSpacing.lg),
               Container(
@@ -94,22 +185,26 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
                 decoration: AppDecorations.card(
                   radius: AppRadii.md,
                   prominent: true,
-                  color: AppColors.softPink,
-                  borderColor: AppColors.accentPink.withValues(alpha: 0.22),
+                  color: AppColors.softBlue,
+                  borderColor: AppColors.accentBlue.withValues(alpha: 0.22),
                 ),
                 child: Center(
-                  child: Text(
-                    _nameController.text.trim().isEmpty
-                        ? 'Your name'
-                        : _nameController.text.trim(),
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.signaturePreview(
-                      color: AppColors.accentPink,
-                      size: 36,
-                    ),
-                  ),
+                  child: hasImage
+                      ? Image.file(
+                          File(imagePath),
+                          fit: BoxFit.contain,
+                          filterQuality: FilterQuality.medium,
+                        )
+                      : Text(
+                          previewName,
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.signaturePreview(
+                            color: AppColors.accentBlue,
+                            size: 36,
+                          ),
+                        ),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),

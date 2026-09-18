@@ -3,9 +3,11 @@ import 'package:go_router/go_router.dart';
 
 import '../models/document_model.dart';
 import '../models/signature_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
-import '../widgets/accent_title.dart';
+import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/signature_visual.dart';
 
 String _shortDate(DateTime d) {
   const months = [
@@ -20,12 +22,10 @@ class QuickShareScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final signatures = DummySignatures.seed();
-    final defaultSig = signatures.firstWhere(
-      (s) => s.isDefault,
-      orElse: () => signatures.first,
-    );
-    final documents = DummyDocuments.seed();
+    final signatures = StorageService.getAllSignatures();
+    final defaultSig = StorageService.getDefaultSignature() ??
+        (signatures.isNotEmpty ? signatures.first : null);
+    final documents = StorageService.getAllDocuments();
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
@@ -40,23 +40,10 @@ class QuickShareScreen extends StatelessWidget {
                 AppSpacing.xl,
                 AppSpacing.xs,
               ),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: AccentTitle(
-                      title: 'Quick Share',
-                      accent: AppColors.accentPink,
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
-                    ),
-                  ),
-                ],
+              child: NavyAppHeader(
+                title: 'Quick Share',
+                onBack: () => context.pop(),
+                fontSize: 22,
               ),
             ),
             Expanded(
@@ -78,24 +65,38 @@ class QuickShareScreen extends StatelessWidget {
                     decoration: AppDecorations.card(
                       radius: AppRadii.md,
                       prominent: true,
-                      color: AppColors.softPink,
+                      color: AppColors.softBlue,
                       borderColor:
-                          AppColors.accentPink.withValues(alpha: 0.22),
+                          AppColors.accentBlue.withValues(alpha: 0.22),
                     ),
                     child: Column(
                       children: [
-                        Text(
-                          defaultSig.name,
-                          style: AppTextStyles.signaturePreview(
-                            color: AppColors.accentPink,
-                            size: 40,
+                        if (defaultSig == null)
+                          Text(
+                            'No signature yet',
+                            style: AppTextStyles.signaturePreview(
+                              color: AppColors.accentBlue,
+                              size: 40,
+                            ),
+                          )
+                        else
+                          SizedBox(
+                            height: 56,
+                            child: SignatureVisual.fromModel(
+                              defaultSig,
+                              color: AppColors.accentBlue,
+                              fontSize: 40,
+                            ),
                           ),
-                        ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(
-                          'Ready to apply',
+                          defaultSig == null
+                              ? 'Create a signature first'
+                              : 'Ready to apply',
                           style: AppTextStyles.labelMedium.copyWith(
-                            color: AppColors.accentMintGreen,
+                            color: defaultSig == null
+                                ? AppColors.textSecondary
+                                : AppColors.accentBlue,
                           ),
                         ),
                       ],
@@ -118,6 +119,14 @@ class QuickShareScreen extends StatelessWidget {
                       child: _ShareDocumentTile(
                         document: doc,
                         onTap: () {
+                          if (defaultSig == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Create a signature first'),
+                              ),
+                            );
+                            return;
+                          }
                           context.push(
                             '/quick-share/success',
                             extra: <String, Object>{
@@ -151,7 +160,7 @@ class _ShareDocumentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tint = document.isPdf
-        ? AppColors.accentMintGreen
+        ? AppColors.accentBlue
         : AppColors.accentPurple;
 
     return PressableScale(
@@ -196,7 +205,7 @@ class _ShareDocumentTile extends StatelessWidget {
                   Text(
                     'Signed · ${_shortDate(document.updatedAt)}',
                     style: AppTextStyles.labelMedium.copyWith(
-                      color: AppColors.accentMintGreen,
+                      color: AppColors.accentBlue,
                     ),
                   ),
                 ],
@@ -204,7 +213,7 @@ class _ShareDocumentTile extends StatelessWidget {
             ),
             const Icon(
               Icons.send_rounded,
-              color: AppColors.accentPink,
+              color: AppColors.accentPurple,
               size: 20,
             ),
           ],
@@ -253,8 +262,8 @@ class QuickShareSuccessScreen extends StatelessWidget {
                 decoration: AppDecorations.card(
                   radius: AppRadii.xl,
                   prominent: true,
-                  color: AppColors.softGreen,
-                  borderColor: AppColors.accentMintGreen.withValues(alpha: 0.25),
+                  color: AppColors.softBlue,
+                  borderColor: AppColors.accentBlue.withValues(alpha: 0.25),
                 ),
                 child: Column(
                   children: [
@@ -262,12 +271,12 @@ class QuickShareSuccessScreen extends StatelessWidget {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: AppColors.accentMintGreen.withValues(alpha: 0.18),
+                        color: AppColors.accentBlue.withValues(alpha: 0.18),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.check_rounded,
-                        color: AppColors.accentMintGreen,
+                        color: AppColors.accentBlue,
                         size: 34,
                       ),
                     ),

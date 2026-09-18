@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
 class ScanSignatureScreen extends StatelessWidget {
@@ -46,25 +47,10 @@ class ScanSignatureScreen extends StatelessWidget {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        onPressed: () => context.pop(),
-                        icon: const Icon(
-                          Icons.arrow_back_rounded,
-                          color: Colors.white,
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Scan Signature',
-                          style: AppTextStyles.titleLarge.copyWith(
-                            fontSize: 15,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: NavyAppHeader(
+                    title: 'Scan Signature',
+                    onBack: () => context.pop(),
+                    fontSize: 15,
                   ),
                 ),
                 const Spacer(flex: 2),
@@ -115,7 +101,7 @@ class _ScanFrame extends StatelessWidget {
       height: height,
       child: CustomPaint(
         painter: _CornerBracketPainter(
-          color: AppColors.accentMintGreen,
+          color: AppColors.accentBlue,
           strokeWidth: 3.2,
           cornerLength: 28,
           radius: 16,
@@ -242,7 +228,7 @@ class _CaptureButton extends StatelessWidget {
           shape: BoxShape.circle,
           color: Colors.white,
           border: Border.all(
-            color: AppColors.accentMintGreen,
+            color: AppColors.accentBlue,
             width: 5,
           ),
           boxShadow: AppShadows.elevated,

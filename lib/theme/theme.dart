@@ -10,30 +10,35 @@ class AppColors {
   static const Color cardBackground = Color(0xFFF9F7FB);
   static const Color altCardBackground = Color(0xFFF5F0FA);
 
-  // Brand accents from HTML
-  static const Color accentPink = Color(0xFFFF3E9A);
+  // Brand accents — Home combo only: navy / blue / purple (no pink).
+  static const Color accentPink = Color(0xFFA93EFF); // aliased to purple
   static const Color accentPurple = Color(0xFFA93EFF);
-  static const Color accentPurpleDark = Color(0xFFFF3E9A);
+  static const Color accentPurpleDark = Color(0xFF7A2AD4);
   static const Color accentBlue = Color(0xFF2D7BFF);
   static const Color accentBlueLight = Color(0xFF4C6AFF);
-  static const Color accentOrange = Color(0xFFFF8A2B);
+  static const Color accentOrange = Color(0xFF2D7BFF); // aliased to blue
 
-  static const Color accentMintGreen = Color(0xFF17C964);
-  static const Color accentGreenDark = Color(0xFF12A352);
-  static const Color accentGreenLight = Color(0xFF5EE897);
+  /// Professional navy for header / bottom nav (design reference).
+  static const Color navy = Color(0xFF1A2744);
+  static const Color navyMuted = Color(0xFFB7C2D6);
+  static const Color softNavy = Color(0xFFD8DEEA);
 
-  static const Color danger = Color(0xFFF5378C);
+  static const Color accentMintGreen = Color(0xFF2D7BFF); // aliased to blue
+  static const Color accentGreenDark = Color(0xFF1E5FCC);
+  static const Color accentGreenLight = Color(0xFF4CA1FF);
 
-  // Soft pastel fills — deepened for tile/header contrast (same hue family)
-  static const Color softPink = Color(0xFFFFC2DC);
-  static const Color softOrange = Color(0xFFFFD0A3);
+  static const Color danger = Color(0xFF2D7BFF); // keep usable, no pink
+
+  // Soft pastel fills — navy / blue / purple family only
+  static const Color softPink = Color(0xFFF0E4FF); // soft purple
+  static const Color softOrange = Color(0xFFC2D6FF); // soft blue
   static const Color softBlue = Color(0xFFC2D6FF);
-  static const Color softGreen = Color(0xFFB5F0C6);
+  static const Color softGreen = Color(0xFFC2D6FF); // soft blue
   static const Color softPurple = Color(0xFFF0E4FF);
-  static const Color softSurface = Color(0xFFF9F7FB);
-  static const Color softDot = Color(0xFFF0E9F5);
-  static const Color softDanger = Color(0xFFFFECEC);
-  static const Color softPdf = Color(0xFFFFE1E1);
+  static const Color softSurface = Color(0xFFF7F8FB);
+  static const Color softDot = Color(0xFFE8ECF4);
+  static const Color softDanger = Color(0xFFE8EEF8);
+  static const Color softPdf = Color(0xFFD6E4FF);
 
   // Text — HTML light theme
   static const Color textPrimary = Color(0xFF241A38);
@@ -48,37 +53,38 @@ class AppColors {
   static const Color cardShadow = Color(0x1A000000);
   static const Color wateryGlow = Color(0x33A93EFF);
 
-  /// Splash / shell: pink → purple → blue (HTML exact)
+  /// Brand: navy → purple → blue (Home combo)
   static const LinearGradient brandGradient = LinearGradient(
     begin: Alignment(-0.8, -1),
     end: Alignment(0.8, 1),
-    colors: [accentPink, accentPurple, accentBlueLight],
+    colors: [navy, accentPurple, accentBlue],
     stops: [0.0, 0.55, 1.0],
   );
 
-  /// Tab shell gradient (HTML home frame)
+  /// Shell / frame wash
   static const LinearGradient shellGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [accentPink, accentPurple],
+    colors: [navy, accentBlue],
   );
 
+  /// Primary CTA — purple only (no pink)
   static const LinearGradient purpleGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [accentPink, accentPurple],
+    colors: [Color(0xFFC56BFF), accentPurple],
   );
 
   static const LinearGradient greenGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [accentGreenLight, accentMintGreen],
+    colors: [Color(0xFF4CA1FF), accentBlue],
   );
 
   static const LinearGradient pinkGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [accentPink, Color(0xFFFF7BB8)],
+    colors: [Color(0xFFC56BFF), accentPurple],
   );
 
   static const LinearGradient blueGradient = LinearGradient(
@@ -90,14 +96,21 @@ class AppColors {
   static const LinearGradient orangeGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFFFB35A), accentOrange],
+    colors: [Color(0xFF4CA1FF), accentBlue],
   );
 
-  /// Sign-doc tile — purple only (not pink→purple like Share).
+  /// Violet tile / CTA — light → dark purple
   static const LinearGradient violetGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [Color(0xFFC56BFF), accentPurple],
+  );
+
+  /// Navy CTA alternative
+  static const LinearGradient navyGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF243556), navy],
   );
 }
 
@@ -215,19 +228,19 @@ class AppDecorations {
 
   static BoxDecoration purpleButton({double radius = AppRadii.md}) {
     return BoxDecoration(
-      gradient: AppColors.purpleGradient,
+      gradient: AppColors.violetGradient,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
-      boxShadow: AppShadows.tinted(color: AppColors.accentPurpleDark),
+      boxShadow: AppShadows.tinted(color: AppColors.accentPurple),
     );
   }
 
   static BoxDecoration greenButton({double radius = AppRadii.md}) {
     return BoxDecoration(
-      gradient: AppColors.greenGradient,
+      gradient: AppColors.blueGradient,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(color: Colors.white.withValues(alpha: 0.22), width: 1),
-      boxShadow: AppShadows.tinted(color: AppColors.accentGreenDark),
+      boxShadow: AppShadows.tinted(color: AppColors.accentBlue),
     );
   }
 }
@@ -344,7 +357,7 @@ class AppTextStyles {
   static TextStyle signaturePreview({Color? color, double size = 28}) =>
       GoogleFonts.greatVibes(
         fontSize: size,
-        color: color ?? AppColors.accentPink,
+        color: color ?? AppColors.accentPurple,
         height: 1.1,
       );
 
@@ -377,7 +390,7 @@ class AppTheme {
       scaffoldBackgroundColor: AppColors.primaryBackground,
       colorScheme: const ColorScheme.light(
         primary: AppColors.accentPurple,
-        secondary: AppColors.accentPink,
+        secondary: AppColors.accentBlue,
         surface: AppColors.cardBackground,
         onPrimary: AppColors.textOnAccent,
         onSecondary: AppColors.textOnAccent,

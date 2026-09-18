@@ -20,11 +20,11 @@ class SignSuccessScreen extends StatelessWidget {
                 width: 96,
                 height: 96,
                 decoration: BoxDecoration(
-                  color: AppColors.accentMintGreen.withValues(alpha: 0.16),
+                  color: AppColors.accentBlue.withValues(alpha: 0.16),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.accentMintGreen.withValues(alpha: 0.25),
+                      color: AppColors.accentBlue.withValues(alpha: 0.25),
                       blurRadius: 24,
                       offset: const Offset(0, 8),
                     ),
@@ -32,7 +32,7 @@ class SignSuccessScreen extends StatelessWidget {
                 ),
                 child: const Icon(
                   Icons.check_rounded,
-                  color: AppColors.accentMintGreen,
+                  color: AppColors.accentBlue,
                   size: 52,
                 ),
               ),
@@ -54,12 +54,12 @@ class SignSuccessScreen extends StatelessWidget {
                 height: 52,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: AppColors.purpleGradient,
+                    gradient: AppColors.violetGradient,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
                         color:
-                            AppColors.accentPink.withValues(alpha: 0.4),
+                            AppColors.accentPurple.withValues(alpha: 0.4),
                         blurRadius: 14,
                         offset: const Offset(0, 6),
                       ),

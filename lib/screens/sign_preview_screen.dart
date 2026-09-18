@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../theme/theme.dart';
+import '../widgets/navy_app_header.dart';
 
 /// SCREEN B — Document Preview
 class SignPreviewScreen extends StatelessWidget {
@@ -16,22 +17,10 @@ class SignPreviewScreen extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(
-                      Icons.arrow_back_rounded,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      'Preview',
-                      style: AppTextStyles.titleLarge.copyWith(fontSize: 15),
-                    ),
-                  ),
-                ],
+              child: NavyAppHeader(
+                title: 'Preview',
+                onBack: () => context.pop(),
+                fontSize: 15,
               ),
             ),
             Expanded(
@@ -112,12 +101,12 @@ class SignPreviewScreen extends StatelessWidget {
                 height: 52,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: AppColors.purpleGradient,
+                    gradient: AppColors.violetGradient,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
                         color:
-                            AppColors.accentPink.withValues(alpha: 0.4),
+                            AppColors.accentPurple.withValues(alpha: 0.4),
                         blurRadius: 14,
                         offset: const Offset(0, 6),
                       ),

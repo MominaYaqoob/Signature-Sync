@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/document_model.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
-import '../widgets/accent_title.dart';
 import '../widgets/pressable_scale.dart';
 
 String _shortDate(DateTime d) {
@@ -21,7 +21,6 @@ class DocumentsScreen extends StatefulWidget {
 }
 
 class _DocumentsScreenState extends State<DocumentsScreen> {
-  late List<DocumentModel> _documents;
   bool _searchOpen = false;
   final _searchController = TextEditingController();
   String _query = '';
@@ -29,7 +28,10 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   @override
   void initState() {
     super.initState();
-    _documents = List<DocumentModel>.from(DummyDocuments.seed());
+  }
+
+  void _reload() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -38,18 +40,21 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     super.dispose();
   }
 
+  List<DocumentModel> get _documents => StorageService.getAllDocuments();
+
   List<DocumentModel> get _filtered {
     final q = _query.trim().toLowerCase();
-    if (q.isEmpty) return _documents;
-    return _documents
+    final documents = _documents;
+    if (q.isEmpty) return documents;
+    return documents
         .where((d) => d.title.toLowerCase().contains(q))
         .toList();
   }
 
-  void _delete(DocumentModel doc) {
-    setState(() {
-      _documents = _documents.where((d) => d.id != doc.id).toList();
-    });
+  Future<void> _delete(DocumentModel doc) async {
+    await StorageService.deleteDocument(doc.id);
+    _reload();
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${doc.title} deleted')),
     );
@@ -94,7 +99,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         );
       },
     );
-    if (confirmed == true && mounted) _delete(doc);
+    if (confirmed == true && mounted) await _delete(doc);
   }
 
   @override
@@ -108,58 +113,95 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xl,
-              AppSpacing.sm,
-              AppSpacing.xs,
-              AppSpacing.sm,
+            padding: const EdgeInsets.only(
+              top: AppSpacing.lg,
+              bottom: AppSpacing.md,
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _searchOpen
-                      ? TextField(
-                          controller: _searchController,
-                          autofocus: true,
-                          onChanged: (value) =>
-                              setState(() => _query = value),
-                          style: AppTextStyles.bodyMedium,
-                          decoration: InputDecoration(
-                            hintText: 'Search documents',
-                            isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: AppSpacing.md,
-                              vertical: 10,
-                            ),
-                            suffixIcon: IconButton(
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () {
-                                setState(() {
-                                  _searchOpen = false;
-                                  _query = '';
-                                  _searchController.clear();
-                                });
-                              },
-                            ),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xFF243556),
+                    AppColors.navy,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(alpha: 0.22),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: _searchOpen
+                  ? TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      onChanged: (value) => setState(() => _query = value),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textOnAccent,
+                      ),
+                      cursorColor: AppColors.textOnAccent,
+                      decoration: InputDecoration(
+                        hintText: 'Search documents',
+                        hintStyle: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.navyMuted,
+                        ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.sm),
+                          borderSide: BorderSide.none,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: AppColors.textOnAccent,
                           ),
-                        )
-                      : AccentTitle(
-                          title: 'Documents',
-                          accent: AppColors.accentBlue,
-                          style: AppTextStyles.titleLarge.copyWith(
-                            fontSize: 22,
+                          onPressed: () {
+                            setState(() {
+                              _searchOpen = false;
+                              _query = '';
+                              _searchController.clear();
+                            });
+                          },
+                        ),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Documents',
+                            style: AppTextStyles.titleLarge.copyWith(
+                              fontSize: 22,
+                              color: AppColors.textOnAccent,
+                            ),
                           ),
                         ),
-                ),
-                if (!_searchOpen)
-                  IconButton(
-                    onPressed: () => setState(() => _searchOpen = true),
-                    icon: const Icon(
-                      Icons.search_rounded,
-                      color: AppColors.textPrimary,
+                        IconButton(
+                          onPressed: () =>
+                              setState(() => _searchOpen = true),
+                          icon: const Icon(
+                            Icons.search_rounded,
+                            color: AppColors.textOnAccent,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-              ],
             ),
           ),
           Expanded(
@@ -227,7 +269,7 @@ class _DocumentHistoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPdf = document.isPdf;
-    final tint = isPdf ? AppColors.accentMintGreen : AppColors.accentPurple;
+    final tint = isPdf ? AppColors.accentBlue : AppColors.accentPurple;
     final icon = isPdf
         ? Icons.picture_as_pdf_rounded
         : Icons.image_outlined;
@@ -288,7 +330,7 @@ class _DocumentHistoryCard extends StatelessWidget {
                         'Signed · ${_shortDate(document.updatedAt)}',
                         style: AppTextStyles.labelMedium.copyWith(
                           fontSize: 11,
-                          color: AppColors.accentMintGreen,
+                          color: AppColors.accentBlue,
                         ),
                       ),
                     ],
@@ -335,7 +377,7 @@ class _EmptyDocuments extends StatelessWidget {
               ),
               child: const Icon(
                 Icons.folder_open_outlined,
-                color: AppColors.accentMintGreen,
+                color: AppColors.accentBlue,
                 size: 34,
               ),
             ),

@@ -1,6 +1,26 @@
-enum DocumentStatus { draft, pending, signed, expired }
+import 'package:hive/hive.dart';
 
-enum DocumentFileType { pdf, image }
+part 'document_model.g.dart';
+
+@HiveType(typeId: 3)
+enum DocumentStatus {
+  @HiveField(0)
+  draft,
+  @HiveField(1)
+  pending,
+  @HiveField(2)
+  signed,
+  @HiveField(3)
+  expired,
+}
+
+@HiveType(typeId: 4)
+enum DocumentFileType {
+  @HiveField(0)
+  pdf,
+  @HiveField(1)
+  image,
+}
 
 extension DocumentStatusX on DocumentStatus {
   String get statusLabel => switch (this) {
@@ -11,6 +31,7 @@ extension DocumentStatusX on DocumentStatus {
       };
 }
 
+@HiveType(typeId: 1)
 class DocumentModel {
   const DocumentModel({
     required this.id,
@@ -22,59 +43,28 @@ class DocumentModel {
     this.fileType = DocumentFileType.pdf,
   });
 
+  @HiveField(0)
   final String id;
+
+  @HiveField(1)
   final String title;
+
+  @HiveField(2)
   final DocumentStatus status;
+
+  @HiveField(3)
   final DateTime updatedAt;
+
+  @HiveField(4)
   final int pageCount;
+
+  @HiveField(5)
   final String? signerName;
+
+  @HiveField(6)
   final DocumentFileType fileType;
 
   String get statusLabel => status.statusLabel;
 
   bool get isPdf => fileType == DocumentFileType.pdf;
-}
-
-/// Placeholder documents for UI-only screens.
-class DummyDocuments {
-  DummyDocuments._();
-
-  static List<DocumentModel> seed() => [
-        DocumentModel(
-          id: 'doc_rent',
-          title: 'Rent agreement.pdf',
-          status: DocumentStatus.signed,
-          updatedAt: DateTime(2026, 9, 10),
-          pageCount: 4,
-          fileType: DocumentFileType.pdf,
-        ),
-        DocumentModel(
-          id: 'doc_offer',
-          title: 'Offer letter.pdf',
-          status: DocumentStatus.signed,
-          updatedAt: DateTime(2026, 9, 8),
-          pageCount: 2,
-          fileType: DocumentFileType.pdf,
-        ),
-        DocumentModel(
-          id: 'doc_scan',
-          title: 'Signed form.jpg',
-          status: DocumentStatus.signed,
-          updatedAt: DateTime(2026, 9, 5),
-          pageCount: 1,
-          fileType: DocumentFileType.image,
-        ),
-      ];
-
-  static final List<DocumentModel> all = seed();
-
-  static DocumentModel? byId(String id) {
-    for (final doc in all) {
-      if (doc.id == id) return doc;
-    }
-    for (final doc in seed()) {
-      if (doc.id == id) return doc;
-    }
-    return null;
-  }
 }

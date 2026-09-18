@@ -28,7 +28,7 @@ const _pages = <_OnboardingPageData>[
     description:
         'Sign naturally with your finger — smooth, personal, and ready in seconds.',
     buttonLabel: 'Next',
-    accent: AppColors.accentPink,
+    accent: AppColors.accentPurple,
     assetPath: 'assets/illustrations/onboarding_draw.png',
   ),
   _OnboardingPageData(
@@ -52,7 +52,7 @@ const _pages = <_OnboardingPageData>[
     description:
         'Place your signature on any contract and finish paperwork without the wait.',
     buttonLabel: 'Next',
-    accent: AppColors.accentMintGreen,
+    accent: AppColors.accentBlue,
     assetPath: 'assets/illustrations/onboarding_sign.png',
   ),
   _OnboardingPageData(
@@ -60,7 +60,7 @@ const _pages = <_OnboardingPageData>[
     description:
         'No login required. Your signatures and files stay on your device.',
     buttonLabel: 'Get Started',
-    accent: AppColors.accentPink,
+    accent: AppColors.accentPurple,
     assetPath: 'assets/illustrations/onboarding_privacy.png',
     isFinal: true,
   ),
@@ -117,9 +117,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 shape: BoxShape.circle,
                 color: page.accent == AppColors.accentBlue
                     ? AppColors.softBlue
-                    : page.accent == AppColors.accentMintGreen
-                        ? AppColors.softGreen
-                        : AppColors.softPink,
+                    : page.accent == AppColors.accentBlue
+                        ? AppColors.softBlue
+                        : AppColors.softPurple,
               ),
             ),
           ),
@@ -210,7 +210,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             page.buttonLabel,
                             style: AppTextStyles.labelLarge.copyWith(
                               color: isFinal
-                                  ? AppColors.accentPink
+                                  ? AppColors.accentPurple
                                   : AppColors.textOnAccent,
                             ),
                           ),
