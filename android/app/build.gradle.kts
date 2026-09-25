@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.signaturesync.signature_sync"
-    compileSdk = flutter.compileSdkVersion
+    // Required by image_picker_android / flutter_plugin_android_lifecycle (SDK 36+).
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -19,7 +20,8 @@ android {
         applicationId = "com.signaturesync.signature_sync"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // 24 is required by google_mobile_ads.
+        minSdk = maxOf(flutter.minSdkVersion, 24)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

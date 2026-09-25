@@ -84,7 +84,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  void _goHome() => context.go('/home');
+  // Both Skip and the final page route through the agree-to-terms gate
+  // before Home; it marks onboarding as done so Splash won't show it again.
+  void _goHome() => context.go('/agree');
 
   void _onPrimary() {
     if (_index >= _pages.length - 1) {

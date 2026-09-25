@@ -1,14 +1,15 @@
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image/image.dart' as img;
-import 'package:path_provider/path_provider.dart';
 import 'package:signature/signature.dart';
 
+import '../services/ads_service.dart';
+import '../services/signature_image_store.dart';
 import '../theme/theme.dart';
+import '../widgets/help_screen.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
@@ -65,6 +66,20 @@ class DrawSignatureScreen extends StatefulWidget {
 
 class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
   static const _canvasColor = Color(0xFFF8F7FC);
+  static const _clearRed = Color(0xFFE53935);
+  static const _undoSkyBlue = Color(0xFF0EA5E9);
+
+  static BoxDecoration _solidButton(Color color) => BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      );
 
   static const _penColors = <Color>[
     Color(0xFF111111),
@@ -228,7 +243,10 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
   /// Builds a PNG cropped to ink bounds with a fully transparent background.
   Future<Uint8List?> _exportCroppedPng() async {
     final points = _controller.points;
-    if (points.isEmpty) return null;
+    if (points.isEmpty) {
+      debugPrint('[DrawSignature] export aborted: no points');
+      return null;
+    }
 
     // Bounding box from all points (includes eraser strokes).
     var minX = points.first.offset.dx;
@@ -248,66 +266,106 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
     final pad = _exportMargin + (maxStroke / 2);
     final exportW = math.max(1, (maxX - minX + pad * 2).ceil());
     final exportH = math.max(1, (maxY - minY + pad * 2).ceil());
+    debugPrint(
+      '[DrawSignature] export bbox=${exportW}x$exportH points=${points.length}',
+    );
 
     final rawBytes = await _controller.toPngBytes(
       width: exportW,
       height: exportH,
     );
-    if (rawBytes == null || rawBytes.isEmpty) return null;
+    if (rawBytes == null || rawBytes.isEmpty) {
+      debugPrint('[DrawSignature] toPngBytes returned empty');
+      return null;
+    }
+    debugPrint('[DrawSignature] raw PNG bytes=${rawBytes.length}');
 
     final decoded = img.decodeImage(rawBytes);
-    if (decoded == null) return null;
+    if (decoded == null) {
+      debugPrint('[DrawSignature] decodeImage failed');
+      return null;
+    }
 
     // Eraser strokes are painted as canvas color — punch them (and any
     // leftover bg) to full transparency before cropping.
     _makeCanvasColorTransparent(decoded, tol: 10);
+    debugPrint('[DrawSignature] canvas-color → transparent done');
     final cropped = _cropToContent(decoded, margin: _exportMargin);
+    debugPrint(
+      '[DrawSignature] cropped PNG ${cropped.width}x${cropped.height}',
+    );
     return Uint8List.fromList(img.encodePng(cropped));
   }
 
-  Future<void> _save() async {
+  void _showError(String message) {
+    if (!mounted) return;
+    debugPrint('[DrawSignature] ERROR: $message');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _save({Uint8List? preExported}) async {
     if (_saving) return;
     if (!_controller.isNotEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please draw your signature first')),
-      );
+      _showError('Please draw your signature first');
       return;
     }
 
     setState(() => _saving = true);
+    debugPrint('[DrawSignature] save started');
     try {
-      final bytes = await _exportCroppedPng();
+      final bytes = preExported ?? await _exportCroppedPng();
       if (bytes == null || bytes.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please draw your signature first')),
-        );
+        _showError('Could not export signature image — try drawing again');
         return;
       }
 
-      final docs = await getApplicationDocumentsDirectory();
-      final signaturesDir = Directory('${docs.path}/signatures');
-      if (!await signaturesDir.exists()) {
-        await signaturesDir.create(recursive: true);
-      }
-
       final id = 'sig_${DateTime.now().millisecondsSinceEpoch}';
-      final file = File('${signaturesDir.path}/$id.png');
-      await file.writeAsBytes(bytes, flush: true);
+      final imageRef = await SignatureImageStore.save(id, bytes);
+      debugPrint('[DrawSignature] image stored (${bytes.length} bytes)');
 
       if (!mounted) return;
+      debugPrint('[DrawSignature] navigating to /save-signature');
       await context.push(
         '/save-signature',
         extra: <String, String>{
           'name': '',
           'style': 'Drawn',
           'source': 'draw',
-          'imagePath': file.path,
+          'imagePath': imageRef,
           'id': id,
         },
       );
+      debugPrint('[DrawSignature] returned from save-signature');
+    } catch (e, st) {
+      debugPrint('[DrawSignature] save failed: $e\n$st');
+      _showError('Could not save signature: $e');
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _openPreview() async {
+    if (_saving) return;
+    if (!_controller.isNotEmpty) {
+      _showError('Please draw your signature first');
+      return;
+    }
+    final bytes = await _exportCroppedPng();
+    if (!mounted) return;
+    if (bytes == null || bytes.isEmpty) {
+      _showError('Could not build preview — try drawing again');
+      return;
+    }
+    final shouldSave = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _SignaturePreviewPage(pngBytes: bytes),
+      ),
+    );
+    if (shouldSave == true && mounted) {
+      await _save(preExported: bytes);
     }
   }
 
@@ -338,7 +396,58 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
             children: [
               NavyAppHeader(
                 title: 'Draw Signature',
-                onBack: () => context.pop(),
+                onBack: () => AdsService.instance.showInterstitial(
+                  onComplete: () {
+                    if (context.mounted) context.pop();
+                  },
+                ),
+                trailing: HelpButton(
+                  onTap: () => HelpScreen.show(context, const HelpScreen(
+                    title: 'Draw Signature',
+                    intro: 'Sign with your finger or a stylus, just like on '
+                        'paper — the background is removed automatically.',
+                    steps: [
+                      HelpStep(
+                        icon: Icons.draw_rounded,
+                        title: 'Draw on the canvas',
+                        body: 'Sign in one smooth motion for the most '
+                            'natural-looking result.',
+                      ),
+                      HelpStep(
+                        icon: Icons.palette_outlined,
+                        title: 'Pick a pen, colour and thickness',
+                        body: 'Switch pen type, ink colour or stroke '
+                            'thickness any time — your existing strokes '
+                            'stay as they were drawn.',
+                      ),
+                      HelpStep(
+                        icon: Icons.undo_rounded,
+                        title: 'Undo or Clear',
+                        body: 'Undo removes your last stroke; Clear starts '
+                            'the canvas over.',
+                      ),
+                      HelpStep(
+                        icon: Icons.fullscreen_rounded,
+                        title: 'Preview',
+                        body: 'Tap "Preview" above the canvas to see the '
+                            'final, cropped signature full-screen before '
+                            'saving.',
+                      ),
+                      HelpStep(
+                        icon: Icons.save_outlined,
+                        title: 'Save',
+                        body: 'Tap "Save Signature" to name it and add it '
+                            'to My Signatures.',
+                      ),
+                    ],
+                    tips: [
+                      'A slightly wider pen usually looks more like a real '
+                          'signature.',
+                      'You can always come back and draw another version — '
+                          'saved signatures don’t get overwritten.',
+                    ],
+                  )),
+                ),
                 fontSize: 15,
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -373,16 +482,43 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                         ),
                       ),
                       Positioned(
-                        right: AppSpacing.md,
-                        top: AppSpacing.sm,
-                        child: IgnorePointer(
-                          child: Text(
-                            'Preview',
-                            style: AppTextStyles.labelMedium.copyWith(
-                              fontSize: 11,
-                              color: AppColors.navy.withValues(alpha: 0.55),
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.6,
+                        right: AppSpacing.sm,
+                        top: AppSpacing.xs,
+                        child: PressableScale(
+                          onTap: _openPreview,
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.navy.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: AppColors.navy.withValues(alpha: 0.15),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.fullscreen_rounded,
+                                  size: 14,
+                                  color: AppColors.navy.withValues(alpha: 0.75),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Preview',
+                                  style: AppTextStyles.labelMedium.copyWith(
+                                    fontSize: 11,
+                                    color:
+                                        AppColors.navy.withValues(alpha: 0.75),
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -532,17 +668,13 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                         onTap: _clear,
                         borderRadius: BorderRadius.circular(AppRadii.sm),
                         child: DecoratedBox(
-                          decoration: AppDecorations.card(
-                            radius: AppRadii.sm,
-                            elevated: false,
-                            sheen: false,
-                          ),
+                          decoration: _solidButton(_clearRed),
                           child: Center(
                             child: Text(
                               'Clear',
                               style: AppTextStyles.bodyMedium.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textSecondary,
+                                color: AppColors.textOnAccent,
                               ),
                             ),
                           ),
@@ -559,27 +691,23 @@ class _DrawSignatureScreenState extends State<DrawSignatureScreen> {
                         onTap: _undo,
                         borderRadius: BorderRadius.circular(AppRadii.sm),
                         child: DecoratedBox(
-                          decoration: AppDecorations.card(
-                            radius: AppRadii.sm,
-                            elevated: false,
-                            sheen: false,
-                          ),
+                          decoration: _solidButton(_undoSkyBlue),
                           child: Center(
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
+                                const Icon(
                                   Icons.undo_rounded,
                                   size: 18,
-                                  color: AppColors.textSecondary,
+                                  color: AppColors.textOnAccent,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   'Undo',
                                   style: AppTextStyles.bodyMedium.copyWith(
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.textSecondary,
+                                    color: AppColors.textOnAccent,
                                   ),
                                 ),
                               ],
@@ -681,6 +809,127 @@ class _PenTypeTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-screen preview of the exported (cropped, transparent) signature.
+/// Pops `true` when the user taps Save, `false` on back.
+class _SignaturePreviewPage extends StatelessWidget {
+  const _SignaturePreviewPage({required this.pngBytes});
+
+  final Uint8List pngBytes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.primaryBackground,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            AppSpacing.xs,
+            AppSpacing.xl,
+            20,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              NavyAppHeader(
+                title: 'Preview',
+                onBack: () => Navigator.of(context).pop(false),
+                fontSize: 15,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Expanded(
+                child: Container(
+                  decoration: AppDecorations.card(
+                    color: Colors.white,
+                    radius: AppRadii.sm,
+                    prominent: true,
+                    borderColor: AppColors.borderSubtle,
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 5,
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: Image.memory(pngBytes, fit: BoxFit.contain),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: PressableScale(
+                        onTap: () => Navigator.of(context).pop(false),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        child: DecoratedBox(
+                          decoration: AppDecorations.card(
+                            radius: AppRadii.sm,
+                            elevated: false,
+                            sheen: false,
+                          ),
+                          child: Center(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.arrow_back_rounded,
+                                  size: 18,
+                                  color: AppColors.navy,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Back',
+                                  style: AppTextStyles.bodyMedium.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.navy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: SizedBox(
+                      height: 52,
+                      child: PressableScale(
+                        onTap: () => Navigator.of(context).pop(true),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                        child: DecoratedBox(
+                          decoration: AppDecorations.purpleButton(
+                            radius: AppRadii.sm,
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Save Signature',
+                              style: AppTextStyles.onAccentLabel.copyWith(
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

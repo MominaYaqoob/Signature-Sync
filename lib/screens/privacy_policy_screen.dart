@@ -49,8 +49,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       const SizedBox(height: AppSpacing.sm),
                       Text(
                         'Signature: Sync is designed to keep your signatures '
-                        'and documents on your device. This page is a UI '
-                        'placeholder and does not represent a final legal policy.',
+                        'and documents on your device. Nothing you create is '
+                        'uploaded anywhere unless you choose to share or '
+                        'save a file yourself.',
                         style: AppTextStyles.secondary.copyWith(height: 1.55),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -66,9 +67,20 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       Text('What we don’t do', style: AppTextStyles.titleMedium),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        '• No account login is required\n'
-                        '• No cloud sync is enabled in this UI build\n'
+                        '• No account or login is required\n'
+                        '• No cloud sync — everything stays on this device\n'
                         '• We do not sell personal data',
+                        style: AppTextStyles.bodyMedium.copyWith(height: 1.55),
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      Text('Your control', style: AppTextStyles.titleMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '• Deleting a signature or document also deletes '
+                        'its file from your device, not just its listing\n'
+                        '• Settings → Clear all data removes everything at '
+                        'once\n'
+                        '• Uninstalling the app erases all of its data',
                         style: AppTextStyles.bodyMedium.copyWith(height: 1.55),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -76,7 +88,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       const SizedBox(height: AppSpacing.xs),
                       Text(
                         'Questions about privacy can be sent to '
-                        'privacy@signature-sync.app (placeholder).',
+                        'privacy@signature-sync.app.',
                         style: AppTextStyles.bodyMedium.copyWith(height: 1.55),
                       ),
                     ],

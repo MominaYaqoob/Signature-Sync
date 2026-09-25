@@ -1,25 +1,17 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:image/image.dart' as img;
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
+import '../services/ads_service.dart';
+import '../services/signature_image_store.dart';
 import '../theme/theme.dart';
+import '../widgets/help_screen.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
-
-/// Paper pixels brighter than this (0–255 luminance) become transparent.
-const _paperBrightnessThreshold = 180;
-
-/// Pixels darker than this are treated as solid ink (fully opaque).
-const _inkBrightnessFloor = 110;
-
-/// Normalized ink color written onto kept strokes (dark navy).
-const _inkColor = AppColors.navy;
+import 'adjust_signature_background_screen.dart';
 
 class ScanSignatureScreen extends StatefulWidget {
   const ScanSignatureScreen({super.key});
@@ -33,58 +25,36 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
 
   bool _busy = false;
 
-  /// Removes light paper background; keeps dark ink with soft edge alpha.
-  Uint8List? _removePaperBackground(Uint8List bytes) {
-    final decoded = img.decodeImage(bytes);
-    if (decoded == null) return null;
-
-    final src = decoded.convert(numChannels: 4);
-    final inkR = (_inkColor.r * 255.0).round().clamp(0, 255);
-    final inkG = (_inkColor.g * 255.0).round().clamp(0, 255);
-    final inkB = (_inkColor.b * 255.0).round().clamp(0, 255);
-
-    final softRange =
-        (_paperBrightnessThreshold - _inkBrightnessFloor).clamp(1, 255);
-
-    for (var y = 0; y < src.height; y++) {
-      for (var x = 0; x < src.width; x++) {
-        final pixel = src.getPixel(x, y);
-        // Rec. 601 luminance
-        final luminance =
-            (0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b).round();
-
-        if (luminance > _paperBrightnessThreshold) {
-          src.setPixelRgba(x, y, 0, 0, 0, 0);
-          continue;
-        }
-
-        final int alpha;
-        if (luminance <= _inkBrightnessFloor) {
-          alpha = 255;
-        } else {
-          // Soft falloff between ink floor and paper threshold.
-          final t = (luminance - _inkBrightnessFloor) / softRange;
-          alpha = ((1.0 - t) * 255.0).round().clamp(0, 255);
-        }
-
-        src.setPixelRgba(x, y, inkR, inkG, inkB, alpha);
-      }
-    }
-
-    return Uint8List.fromList(img.encodePng(src));
+  void _showError(String message) {
+    if (!mounted) return;
+    debugPrint('[ScanSignature] ERROR: $message');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
-  Future<void> _captureAndCrop() async {
+  Future<void> _captureAndCrop({
+    ImageSource source = ImageSource.camera,
+  }) async {
     if (_busy) return;
     setState(() => _busy = true);
+    debugPrint('[ScanSignature] capture started source=$source');
 
     try {
       final picker = ImagePicker();
       final photo = await picker.pickImage(
-        source: ImageSource.camera,
+        source: source,
         imageQuality: 90,
       );
-      if (photo == null) return;
+      if (photo == null) {
+        // User cancelled camera/gallery — return cleanly, no error snackbar.
+        debugPrint('[ScanSignature] pick cancelled by user');
+        return;
+      }
+      debugPrint('[ScanSignature] capture done: ${photo.path}');
       if (!mounted) return;
 
       final cropped = await ImageCropper().cropImage(
@@ -95,7 +65,6 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
             toolbarTitle: 'Crop signature',
             toolbarColor: AppColors.navy,
             toolbarWidgetColor: Colors.white,
-            statusBarColor: AppColors.navy,
             activeControlsWidgetColor: AppColors.accentPurple,
             backgroundColor: _previewBg,
             cropFrameColor: AppColors.accentBlue,
@@ -121,44 +90,63 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
           ),
         ],
       );
-      if (cropped == null) return;
+      if (cropped == null) {
+        debugPrint('[ScanSignature] crop cancelled by user');
+        return;
+      }
+      debugPrint('[ScanSignature] crop done: ${cropped.path}');
       if (!mounted) return;
 
-      final croppedBytes = await File(cropped.path).readAsBytes();
-      final processed = _removePaperBackground(croppedBytes);
+      final croppedBytes = await XFile(cropped.path).readAsBytes();
+      debugPrint('[ScanSignature] cropped bytes=${croppedBytes.length}');
+
+      if (!mounted) return;
+      final processed = await Navigator.of(context).push<Uint8List>(
+        MaterialPageRoute(
+          fullscreenDialog: true,
+          builder: (_) =>
+              AdjustSignatureBackgroundScreen(sourceBytes: croppedBytes),
+        ),
+      );
       if (processed == null || processed.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not process scanned signature')),
-        );
+        debugPrint('[ScanSignature] background adjust cancelled by user');
         return;
       }
 
       final id = 'sig_${DateTime.now().millisecondsSinceEpoch}';
-      final docs = await getApplicationDocumentsDirectory();
-      final signaturesDir = Directory('${docs.path}/signatures');
-      if (!await signaturesDir.exists()) {
-        await signaturesDir.create(recursive: true);
-      }
-      final dest = File('${signaturesDir.path}/$id.png');
-      await dest.writeAsBytes(processed, flush: true);
+      final imageRef = await SignatureImageStore.save(id, processed);
+      debugPrint('[ScanSignature] image stored (${processed.length} bytes)');
 
       if (!mounted) return;
+      debugPrint('[ScanSignature] navigating to /save-signature');
       await context.push(
         '/save-signature',
         extra: <String, String>{
           'name': '',
           'style': 'Scanned',
           'source': 'scan',
-          'imagePath': dest.path,
+          'imagePath': imageRef,
           'id': id,
         },
       );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not capture signature: $e')),
-      );
+      debugPrint('[ScanSignature] returned from save-signature');
+    } catch (e, st) {
+      debugPrint('[ScanSignature] capture/crop failed: $e\n$st');
+      final msg = e.toString().toLowerCase();
+      if (msg.contains('permission') ||
+          msg.contains('access') ||
+          msg.contains('denied') ||
+          msg.contains('camera_access')) {
+        _showError(
+          source == ImageSource.gallery
+              ? 'Photo access is required to pick a signature. '
+                  'Enable it in Settings and try again.'
+              : 'Camera permission is required to scan a signature. '
+                  'Enable it in Settings and try again.',
+        );
+      } else {
+        _showError('Could not process signature image: $e');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -186,17 +174,6 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
               ),
             ),
           ),
-          // Soft faux focus plane
-          Center(
-            child: Container(
-              width: 280,
-              height: 160,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(18),
-              ),
-            ),
-          ),
           SafeArea(
             child: Column(
               children: [
@@ -204,15 +181,62 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
                   padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
                   child: NavyAppHeader(
                     title: 'Scan Signature',
-                    onBack: () => context.pop(),
+                    onBack: () => AdsService.instance.showInterstitial(
+                      onComplete: () {
+                        if (context.mounted) context.pop();
+                      },
+                    ),
+                    trailing: HelpButton(
+                      onTap: () => HelpScreen.show(context, const HelpScreen(
+                        title: 'Scan Signature',
+                        intro: 'Sign on paper with a pen, then capture it — '
+                            'the paper background is removed '
+                            'automatically, leaving just your ink.',
+                        steps: [
+                          HelpStep(
+                            icon: Icons.edit_note_rounded,
+                            title: 'Sign on plain white paper',
+                            body: 'A dark pen on plain white paper (no '
+                                'lines) gives the cleanest result.',
+                          ),
+                          HelpStep(
+                            icon: Icons.photo_camera_outlined,
+                            title: 'Capture or pick a photo',
+                            body: 'Tap the camera button to take a photo, '
+                                'or "Gallery" to use an existing one.',
+                          ),
+                          HelpStep(
+                            icon: Icons.crop_rounded,
+                            title: 'Crop to the signature',
+                            body: 'Trim the photo down to just the '
+                                'signature area.',
+                          ),
+                          HelpStep(
+                            icon: Icons.tune_rounded,
+                            title: 'Adjust the background removal',
+                            body: 'Drag the slider until only your ink is '
+                                'left on the checkered (transparent) '
+                                'background.',
+                          ),
+                          HelpStep(
+                            icon: Icons.save_outlined,
+                            title: 'Save',
+                            body: 'Name it and add it to My Signatures.',
+                          ),
+                        ],
+                        tips: [
+                          'Avoid shadows across the paper — even lighting '
+                              'gives the cleanest cut-out.',
+                          'A phone photo usually works better than a '
+                              'scanner app export.',
+                        ],
+                      )),
+                    ),
                     fontSize: 15,
                   ),
                 ),
                 const Spacer(flex: 2),
-                const _ScanFrame(
-                  width: 280,
-                  height: 168,
-                ),
+                const _ScanFrameArea(width: 280, height: 168),
                 const SizedBox(height: 18),
                 Text(
                   'Align signature within frame',
@@ -220,10 +244,35 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
                     color: Colors.white.withValues(alpha: 0.5),
                   ),
                 ),
+                const SizedBox(height: 6),
+                Text(
+                  'Sign on plain white paper for the cleanest result',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    fontSize: 11,
+                    color: Colors.white.withValues(alpha: 0.35),
+                  ),
+                ),
                 const Spacer(flex: 3),
-                _CaptureButton(
-                  busy: _busy,
-                  onPressed: _busy ? null : _captureAndCrop,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Center(
+                        child: _GalleryButton(
+                          onPressed: _busy
+                              ? null
+                              : () => _captureAndCrop(
+                                    source: ImageSource.gallery,
+                                  ),
+                        ),
+                      ),
+                    ),
+                    _CaptureButton(
+                      busy: _busy,
+                      onPressed: _busy ? null : _captureAndCrop,
+                    ),
+                    // Keeps the capture button centred.
+                    const Expanded(child: SizedBox()),
+                  ],
                 ),
                 const SizedBox(height: 36),
               ],
@@ -235,8 +284,12 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
   }
 }
 
-class _ScanFrame extends StatelessWidget {
-  const _ScanFrame({required this.width, required this.height});
+/// The soft focus plane and the corner brackets, sized and centred as one
+/// unit so they always land on the exact same box (previously the plane was
+/// centred on the whole screen while the brackets were centred within the
+/// header/footer's leftover space, so they drifted apart on most screens).
+class _ScanFrameArea extends StatelessWidget {
+  const _ScanFrameArea({required this.width, required this.height});
 
   final double width;
   final double height;
@@ -246,13 +299,24 @@ class _ScanFrame extends StatelessWidget {
     return SizedBox(
       width: width,
       height: height,
-      child: CustomPaint(
-        painter: _CornerBracketPainter(
-          color: AppColors.accentBlue,
-          strokeWidth: 3.2,
-          cornerLength: 28,
-          radius: 16,
-        ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(18),
+            ),
+          ),
+          CustomPaint(
+            painter: _CornerBracketPainter(
+              color: AppColors.accentBlue,
+              strokeWidth: 3.2,
+              cornerLength: 28,
+              radius: 16,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -355,6 +419,52 @@ class _CornerBracketPainter extends CustomPainter {
         oldDelegate.strokeWidth != strokeWidth ||
         oldDelegate.cornerLength != cornerLength ||
         oldDelegate.radius != radius;
+  }
+}
+
+class _GalleryButton extends StatelessWidget {
+  const _GalleryButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: onPressed == null ? 0.4 : 1,
+      child: PressableScale(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                ),
+              ),
+              child: const Icon(
+                Icons.photo_library_outlined,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Gallery',
+              style: AppTextStyles.labelMedium.copyWith(
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

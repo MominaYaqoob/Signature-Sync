@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../services/ads_service.dart';
+import '../services/storage_service.dart';
 import '../theme/theme.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -24,7 +27,18 @@ class _SplashScreenState extends State<SplashScreen>
 
     Future<void>.delayed(_duration, () {
       if (!mounted) return;
-      context.go('/onboarding');
+      // Skip straight to Home once onboarding + agree-to-terms is done;
+      // defensive fallback in case storage somehow isn't ready yet.
+      var alreadyOnboarded = false;
+      try {
+        alreadyOnboarded = StorageService.hasCompletedOnboarding;
+      } catch (_) {
+        // Fall through to onboarding.
+      }
+      context.go(alreadyOnboarded ? '/home' : '/onboarding');
+      // Cold-start placement, per the app's ad plan; skipped on web (no
+      // google_mobile_ads implementation there).
+      if (!kIsWeb) AdsService.instance.showAppOpenAdIfAvailable();
     });
   }
 

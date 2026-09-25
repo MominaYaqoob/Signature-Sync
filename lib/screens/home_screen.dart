@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
+import '../widgets/native_ad_card.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/signature_visual.dart';
 
@@ -29,6 +30,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuilds when a signature or document is saved/deleted from anywhere
+    // in the app, so this screen never shows stale "recent" lists.
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        StorageService.signaturesListenable,
+        StorageService.documentsListenable,
+      ]),
+      builder: (context, _) => _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final homeSignatures = StorageService.getAllSignatures();
     final homeDocuments = StorageService.getAllDocuments();
 
@@ -94,12 +107,24 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? AppColors.accentPurple
                         : AppColors.accentBlue;
                     return _SignaturePreviewCard(
-                      name: sig.name,
+                      name: sig.displayText,
                       imagePath: sig.imagePath,
+                      fontLabel: sig.fontLabel,
                       color: color,
                     );
                   },
                 ),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  0,
+                ),
+                child: const NativeAdCard(),
               ),
             ),
             SliverToBoxAdapter(
@@ -313,8 +338,8 @@ class _QuickActionsGrid extends StatelessWidget {
       shadowColor: AppColors.accentPurple,
     ),
     _QuickAction(
-      label: 'Templates',
-      icon: Icons.grid_view_rounded,
+      label: 'Generate',
+      icon: Icons.auto_fix_high_rounded,
       gradient: AppColors.blueGradient,
       shadowColor: AppColors.accentBlue,
     ),
@@ -428,31 +453,23 @@ class _QuickActionCard extends StatelessWidget {
       ),
     );
 
+    // Opening a feature never shows an ad — interstitials only fire when
+    // the user is done (save/back), from inside each feature's own flow.
+    const routes = {
+      'Draw': '/draw-signature',
+      'Scan': '/scan-signature',
+      'Auto': '/auto-signature',
+      'Sign doc': '/sign-document',
+      'Generate': '/signature-generator',
+      'Share': '/quick-share',
+    };
+
     return PressableScale(
       borderRadius: radius,
       onTap: () {
-        if (action.label == 'Draw') {
-          context.push('/draw-signature');
-          return;
-        }
-        if (action.label == 'Scan') {
-          context.push('/scan-signature');
-          return;
-        }
-        if (action.label == 'Auto') {
-          context.push('/auto-signature');
-          return;
-        }
-        if (action.label == 'Sign doc') {
-          context.push('/sign-document');
-          return;
-        }
-        if (action.label == 'Templates') {
-          context.push('/templates');
-          return;
-        }
-        if (action.label == 'Share') {
-          context.push('/quick-share');
+        final route = routes[action.label];
+        if (route != null) {
+          context.push(route);
           return;
         }
         ScaffoldMessenger.of(context).showSnackBar(
@@ -488,10 +505,12 @@ class _SignaturePreviewCard extends StatelessWidget {
     required this.name,
     required this.color,
     this.imagePath,
+    this.fontLabel,
   });
 
   final String name;
   final String? imagePath;
+  final String? fontLabel;
   final Color color;
 
   @override
@@ -514,6 +533,7 @@ class _SignaturePreviewCard extends StatelessWidget {
         child: SignatureVisual(
           name: name,
           imagePath: imagePath,
+          fontLabel: fontLabel,
           color: color,
         ),
       ),

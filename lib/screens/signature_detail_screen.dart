@@ -1,11 +1,17 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/signature_model.dart';
+import '../services/signature_rasterizer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/signature_actions.dart';
 import '../widgets/signature_visual.dart';
 
 class SignatureDetailScreen extends StatefulWidget {
@@ -85,6 +91,36 @@ class _SignatureDetailScreenState extends State<SignatureDetailScreen> {
     setState(() => _signature = updated);
   }
 
+  bool _sharing = false;
+
+  Future<void> _share() async {
+    if (_sharing) return;
+    setState(() => _sharing = true);
+    try {
+      final bytes = await resolveSignatureStampPng(
+        _signature,
+        typedFontSize: 320,
+      );
+      final dir = await getTemporaryDirectory();
+      final safeName = _signature.name
+          .trim()
+          .replaceAll(RegExp(r'[^A-Za-z0-9 _-]'), '')
+          .replaceAll(' ', '_');
+      final path =
+          '${dir.path}/${safeName.isEmpty ? 'signature' : safeName}.png';
+      final file = File(path);
+      await file.writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      await SharePlus.instance.share(
+        ShareParams(files: [XFile(path)], subject: _signature.name),
+      );
+    } catch (e) {
+      if (mounted) _toast('Could not share signature: $e');
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
+  }
+
   Future<void> _setDefault() async {
     await StorageService.setDefaultSignature(_signature.id);
     final updated = StorageService.getSignatureById(_signature.id);
@@ -93,51 +129,11 @@ class _SignatureDetailScreenState extends State<SignatureDetailScreen> {
     _toast('Set as default');
   }
 
-  Future<void> _confirmDelete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.md),
-          ),
-          title: Text(
-            'Delete signature?',
-            style: AppTextStyles.titleMedium,
-          ),
-          content: Text(
-            'Remove “${_signature.name}” from this device. This can’t be undone.',
-            style: AppTextStyles.secondary.copyWith(fontSize: 13),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(
-                'Cancel',
-                style: AppTextStyles.secondary,
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(
-                'Delete',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.danger,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !mounted) return;
-    await StorageService.deleteSignature(_signature.id);
-    if (!mounted) return;
-    _toast('Signature deleted');
+  void _delete() {
+    // Snackbar lives on the app-level messenger, so Undo still works after pop.
+    final messenger = ScaffoldMessenger.of(context);
     context.pop();
+    deleteSignatureWithUndo(messenger, _signature);
   }
 
   @override
@@ -186,8 +182,8 @@ class _SignatureDetailScreenState extends State<SignatureDetailScreen> {
                   decoration: AppDecorations.card(
                     radius: AppRadii.lg,
                     prominent: true,
-                    color: AppColors.softBlue,
-                    borderColor: AppColors.accentBlue.withValues(alpha: 0.22),
+                    color: Colors.white,
+                    borderColor: AppColors.divider,
                   ),
                   child: Center(
                     child: SignatureVisual.fromModel(
@@ -207,7 +203,8 @@ class _SignatureDetailScreenState extends State<SignatureDetailScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                '${_signature.styleLabel} signature',
+                '${_signature.styleLabel} signature · '
+                'Created ${formatSignatureDate(_signature.createdAt)}',
                 textAlign: TextAlign.center,
                 style: AppTextStyles.secondary,
               ),
@@ -220,17 +217,26 @@ class _SignatureDetailScreenState extends State<SignatureDetailScreen> {
               ),
               const SizedBox(height: AppSpacing.sm),
               _ActionRow(
-                icon: Icons.star_outline_rounded,
-                label: 'Set as default',
-                          color: AppColors.accentBlue,
-                onTap: _setDefault,
+                icon: Icons.ios_share_rounded,
+                label: _sharing ? 'Preparing…' : 'Share as PNG',
+                color: AppColors.accentBlue,
+                onTap: _sharing ? () {} : _share,
               ),
+              if (!_signature.isDefault) ...[
+                const SizedBox(height: AppSpacing.sm),
+                _ActionRow(
+                  icon: Icons.star_outline_rounded,
+                  label: 'Set as default',
+                  color: AppColors.accentBlue,
+                  onTap: _setDefault,
+                ),
+              ],
               const SizedBox(height: AppSpacing.sm),
               _ActionRow(
                 icon: Icons.delete_outline_rounded,
                 label: 'Delete',
-                color: AppColors.danger,
-                onTap: _confirmDelete,
+                color: kDeleteRed,
+                onTap: _delete,
               ),
             ],
           ),

@@ -1,12 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 
-class AboutScreen extends StatelessWidget {
+class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
+
+  @override
+  State<AboutScreen> createState() => _AboutScreenState();
+}
+
+class _AboutScreenState extends State<AboutScreen> {
+  // pubspec.yaml's `version:` as a fallback while the real, installed
+  // version/build number loads (and if the platform channel ever fails) —
+  // this stays in sync with the app you actually ship, unlike a hardcoded
+  // string that only reads correctly the day it was written.
+  String _versionLabel = 'Version 1.0.0';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadVersion();
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() {
+        _versionLabel = 'Version ${info.version} (${info.buildNumber})';
+      });
+    } catch (_) {
+      // Keep the fallback label.
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -58,7 +88,7 @@ class AboutScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Version 1.0.0',
+                      _versionLabel,
                       style: AppTextStyles.labelMedium.copyWith(
                         color: AppColors.accentPurple,
                         fontWeight: FontWeight.w600,

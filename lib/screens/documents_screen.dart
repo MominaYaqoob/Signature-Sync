@@ -104,6 +104,15 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuilds whenever a document is saved/deleted from anywhere in the
+    // app (e.g. after signing one), so this list is never stale.
+    return ValueListenableBuilder(
+      valueListenable: StorageService.documentsListenable,
+      builder: (context, _, _) => _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final docs = _filtered;
     final isEmpty = _documents.isEmpty;
 
@@ -190,6 +199,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                               fontSize: 22,
                               color: AppColors.textOnAccent,
                             ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Sign a new document',
+                          onPressed: () => context.push('/sign-document'),
+                          icon: const Icon(
+                            Icons.add_rounded,
+                            color: AppColors.textOnAccent,
                           ),
                         ),
                         IconButton(
@@ -392,6 +409,35 @@ class _EmptyDocuments extends StatelessWidget {
               'Signed PDFs and images will show up here.',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodySmall,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            PressableScale(
+              onTap: () => context.push('/sign-document'),
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: 12,
+                ),
+                decoration: AppDecorations.purpleButton(radius: AppRadii.sm),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.add_rounded,
+                      color: AppColors.textOnAccent,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Sign a document',
+                      style: AppTextStyles.onAccentLabel.copyWith(
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
         ),

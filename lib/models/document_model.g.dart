@@ -21,9 +21,9 @@ class DocumentModelAdapter extends TypeAdapter<DocumentModel> {
       title: fields[1] as String,
       status: fields[2] as DocumentStatus,
       updatedAt: fields[3] as DateTime,
-      pageCount: fields[4] as int? ?? 1,
+      pageCount: fields[4] as int,
       signerName: fields[5] as String?,
-      fileType: fields[6] as DocumentFileType? ?? DocumentFileType.pdf,
+      fileType: fields[6] as DocumentFileType,
       filePath: fields[7] as String?,
     );
   }

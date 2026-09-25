@@ -23,13 +23,16 @@ class SignatureModelAdapter extends TypeAdapter<SignatureModel> {
       createdAt: fields[3] as DateTime,
       isDefault: fields[4] as bool,
       imagePath: fields[5] as String?,
+      signatureText: fields[6] as String?,
+      fontLabel: fields[7] as String?,
+      inkColor: fields[8] as int?,
     );
   }
 
   @override
   void write(BinaryWriter writer, SignatureModel obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +44,13 @@ class SignatureModelAdapter extends TypeAdapter<SignatureModel> {
       ..writeByte(4)
       ..write(obj.isDefault)
       ..writeByte(5)
-      ..write(obj.imagePath);
+      ..write(obj.imagePath)
+      ..writeByte(6)
+      ..write(obj.signatureText)
+      ..writeByte(7)
+      ..write(obj.fontLabel)
+      ..writeByte(8)
+      ..write(obj.inkColor);
   }
 
   @override
@@ -70,6 +79,8 @@ class SignatureStyleAdapter extends TypeAdapter<SignatureStyle> {
         return SignatureStyle.uploaded;
       case 3:
         return SignatureStyle.scanned;
+      case 4:
+        return SignatureStyle.generated;
       default:
         return SignatureStyle.drawn;
     }
@@ -89,6 +100,9 @@ class SignatureStyleAdapter extends TypeAdapter<SignatureStyle> {
         break;
       case SignatureStyle.scanned:
         writer.writeByte(3);
+        break;
+      case SignatureStyle.generated:
+        writer.writeByte(4);
         break;
     }
   }

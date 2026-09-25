@@ -1,77 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_fonts/google_fonts.dart';
 
+import '../services/ads_service.dart';
+import '../theme/signature_fonts.dart';
 import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/signature_inputs.dart';
 
-typedef _FontBuilder = TextStyle Function({
-  double? fontSize,
-  Color? color,
-  FontWeight? fontWeight,
-});
-
-class _SignatureStyle {
-  const _SignatureStyle({
-    required this.id,
-    required this.label,
-    required this.font,
-  });
-
-  final String id;
-  final String label;
-  final _FontBuilder font;
-}
-
-final _styles = <_SignatureStyle>[
-  _SignatureStyle(
-    id: 'dancing',
-    label: 'Dancing Script',
-    font: ({fontSize, color, fontWeight}) => GoogleFonts.dancingScript(
-          fontSize: fontSize,
-          color: color,
-          fontWeight: fontWeight,
-        ),
-  ),
-  _SignatureStyle(
-    id: 'great_vibes',
-    label: 'Great Vibes',
-    font: ({fontSize, color, fontWeight}) => GoogleFonts.greatVibes(
-          fontSize: fontSize,
-          color: color,
-          fontWeight: fontWeight,
-        ),
-  ),
-  _SignatureStyle(
-    id: 'sacramento',
-    label: 'Sacramento',
-    font: ({fontSize, color, fontWeight}) => GoogleFonts.sacramento(
-          fontSize: fontSize,
-          color: color,
-          fontWeight: fontWeight,
-        ),
-  ),
-  _SignatureStyle(
-    id: 'pacifico',
-    label: 'Pacifico',
-    font: ({fontSize, color, fontWeight}) => GoogleFonts.pacifico(
-          fontSize: fontSize,
-          color: color,
-          fontWeight: fontWeight,
-        ),
-  ),
-  _SignatureStyle(
-    id: 'allura',
-    label: 'Allura',
-    font: ({fontSize, color, fontWeight}) => GoogleFonts.allura(
-          fontSize: fontSize,
-          color: color,
-          fontWeight: fontWeight,
-        ),
-  ),
-];
-
+/// Type a name, pick one of the bundled signature fonts and an ink colour.
 class AutoSignatureScreen extends StatefulWidget {
   const AutoSignatureScreen({super.key});
 
@@ -80,13 +17,14 @@ class AutoSignatureScreen extends StatefulWidget {
 }
 
 class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
-  late final TextEditingController _nameController;
-  int _selectedIndex = 0;
+  final _nameController = TextEditingController();
+  SignatureFont _font = kSignatureFonts.first;
+  SignatureFontCategory? _category; // null = All
+  int _inkIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: 'Aliza Khan');
     _nameController.addListener(() => setState(() {}));
   }
 
@@ -96,19 +34,32 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
     super.dispose();
   }
 
-  String get _displayName {
-    final value = _nameController.text.trim();
-    return value.isEmpty ? 'Your Name' : value;
-  }
+  String get _typedName => _nameController.text.trim();
+
+  String get _displayName => _typedName.isEmpty ? 'Your Name' : _typedName;
+
+  Color get _ink => kInkColors[_inkIndex].color;
+
+  List<SignatureFont> get _visibleFonts => _category == null
+      ? kSignatureFonts
+      : kSignatureFonts.where((f) => f.category == _category).toList();
 
   void _useSignature() {
+    if (_typedName.isEmpty) {
+      FocusScope.of(context).unfocus();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Type your name first')),
+      );
+      return;
+    }
     context.push(
       '/save-signature',
       extra: <String, String>{
-        'name': _displayName,
-        'style': _styles[_selectedIndex].label,
+        'name': _typedName,
+        'style': _font.family,
         'source': 'auto',
         'imagePath': '',
+        'ink': '${_ink.toARGB32()}',
         'id': 'sig_${DateTime.now().millisecondsSinceEpoch}',
       },
     );
@@ -116,6 +67,8 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final fonts = _visibleFonts;
+
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       body: SafeArea(
@@ -126,90 +79,96 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
               padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
               child: NavyAppHeader(
                 title: 'Auto Signature',
-                onBack: () => context.pop(),
+                onBack: () => AdsService.instance.showInterstitial(
+                  onComplete: () {
+                    if (context.mounted) context.pop();
+                  },
+                ),
                 fontSize: 15,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                AppSpacing.sm,
-                AppSpacing.xl,
-                0,
-              ),
-              child: TextField(
-                controller: _nameController,
-                style: AppTextStyles.bodyLarge,
-                cursorColor: AppColors.accentPurple,
-                decoration: InputDecoration(
-                  hintText: 'Type your name',
-                  filled: true,
-                  fillColor: AppColors.cardBackground,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.lg,
-                    vertical: AppSpacing.md,
-                  ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.sm),
-                    borderSide: const BorderSide(color: AppColors.borderSubtle),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.sm),
-                    borderSide: const BorderSide(color: AppColors.borderSubtle),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppRadii.sm),
-                    borderSide: const BorderSide(
-                      color: AppColors.accentPurple,
-                      width: 1.5,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.xl,
-                22,
-                AppSpacing.xl,
-                10,
-              ),
-              child: Text(
-                'CHOOSE A STYLE',
-                style: AppTextStyles.eyebrow.copyWith(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.6,
-                ),
-              ),
-            ),
             Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  0,
-                  AppSpacing.xl,
-                  AppSpacing.sm,
-                ),
-                itemCount: _styles.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppSpacing.sm),
-                itemBuilder: (context, index) {
-                  final style = _styles[index];
-                  final selected = index == _selectedIndex;
-                  return _StylePreviewCard(
-                    name: _displayName,
-                    styleLabel: style.label,
-                    textStyle: style.font(
-                      fontSize: 34,
-                      color: selected
-                          ? AppColors.textPrimary
-                          : AppColors.accentPurple.withValues(alpha: 0.95),
+              child: CustomScrollView(
+                slivers: [
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.md,
+                      AppSpacing.xl,
+                      0,
                     ),
-                    selected: selected,
-                    onTap: () => setState(() => _selectedIndex = index),
-                  );
-                },
+                    sliver: SliverList.list(
+                      children: [
+                        _PreviewPaper(
+                          text: _displayName,
+                          isPlaceholder: _typedName.isEmpty,
+                          font: _font,
+                          ink: _ink,
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        SignatureNameField(controller: _nameController),
+                        const SizedBox(height: AppSpacing.md),
+                        InkPicker(
+                          selected: _inkIndex,
+                          onSelect: (i) => setState(() => _inkIndex = i),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        Row(
+                          children: [
+                            Text(
+                              'CHOOSE A STYLE',
+                              style: AppTextStyles.eyebrow.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.6,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${fonts.length} styles',
+                              style: AppTextStyles.bodySmall,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                      ],
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: _CategoryChips(
+                      selected: _category,
+                      onSelect: (c) => setState(() => _category = c),
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.sm,
+                      AppSpacing.xl,
+                      AppSpacing.lg,
+                    ),
+                    sliver: SliverGrid.builder(
+                      itemCount: fonts.length,
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: AppSpacing.sm,
+                        crossAxisSpacing: AppSpacing.sm,
+                        childAspectRatio: 1.45,
+                      ),
+                      itemBuilder: (context, index) {
+                        final font = fonts[index];
+                        return _StyleTile(
+                          text: _displayName,
+                          font: font,
+                          ink: _ink,
+                          selected: font == _font,
+                          onTap: () => setState(() => _font = font),
+                        );
+                      },
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
@@ -224,15 +183,18 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
                 child: PressableScale(
                   onTap: _useSignature,
                   borderRadius: BorderRadius.circular(AppRadii.sm),
-                  child: DecoratedBox(
-                    decoration: AppDecorations.purpleButton(
-                      radius: AppRadii.sm,
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Use this signature',
-                        style: AppTextStyles.onAccentLabel.copyWith(
-                          fontSize: 14,
+                  child: Opacity(
+                    opacity: _typedName.isEmpty ? 0.55 : 1,
+                    child: DecoratedBox(
+                      decoration: AppDecorations.purpleButton(
+                        radius: AppRadii.sm,
+                      ),
+                      child: Center(
+                        child: Text(
+                          'Use this signature',
+                          style: AppTextStyles.onAccentLabel.copyWith(
+                            fontSize: 14,
+                          ),
                         ),
                       ),
                     ),
@@ -247,18 +209,167 @@ class _AutoSignatureScreenState extends State<AutoSignatureScreen> {
   }
 }
 
-class _StylePreviewCard extends StatelessWidget {
-  const _StylePreviewCard({
-    required this.name,
-    required this.styleLabel,
-    required this.textStyle,
+/// Large live preview drawn on "paper" with a signing line.
+class _PreviewPaper extends StatelessWidget {
+  const _PreviewPaper({
+    required this.text,
+    required this.isPlaceholder,
+    required this.font,
+    required this.ink,
+  });
+
+  final String text;
+  final bool isPlaceholder;
+  final SignatureFont font;
+  final Color ink;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 150,
+      decoration: AppDecorations.card(
+        radius: AppRadii.md,
+        prominent: true,
+        color: Colors.white,
+        borderColor: AppColors.divider,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          Positioned(
+            top: 10,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.navy.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                font.family,
+                style: AppTextStyles.labelMedium.copyWith(
+                  fontSize: 10,
+                  color: AppColors.navy,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          // Signing line with an "x" mark, like on a paper form.
+          Positioned(
+            left: 18,
+            right: 18,
+            bottom: 30,
+            child: Row(
+              children: [
+                Text(
+                  '×',
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    color: AppColors.textSecondary,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Container(height: 1, color: AppColors.borderSoft),
+                ),
+              ],
+            ),
+          ),
+          Positioned.fill(
+            left: 28,
+            right: 28,
+            top: 22,
+            bottom: 28,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 180),
+                child: FittedBox(
+                  key: ValueKey('${font.family}|$text|${ink.toARGB32()}'),
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    text,
+                    maxLines: 1,
+                    style: font.style(
+                      fontSize: 48,
+                      color: isPlaceholder ? ink.withValues(alpha: 0.3) : ink,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryChips extends StatelessWidget {
+  const _CategoryChips({required this.selected, required this.onSelect});
+
+  final SignatureFontCategory? selected;
+  final ValueChanged<SignatureFontCategory?> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = <SignatureFontCategory?>[
+      null,
+      ...SignatureFontCategory.values,
+    ];
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+        itemCount: options.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
+        itemBuilder: (context, index) {
+          final option = options[index];
+          final isSelected = option == selected;
+          return PressableScale(
+            onTap: () => onSelect(option),
+            borderRadius: BorderRadius.circular(999),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.navy : AppColors.primaryBackground,
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: isSelected ? AppColors.navy : AppColors.borderSoft,
+                ),
+              ),
+              child: Text(
+                option?.label ?? 'All',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: isSelected
+                      ? AppColors.textOnAccent
+                      : AppColors.textPrimary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StyleTile extends StatelessWidget {
+  const _StyleTile({
+    required this.text,
+    required this.font,
+    required this.ink,
     required this.selected,
     required this.onTap,
   });
 
-  final String name;
-  final String styleLabel;
-  final TextStyle textStyle;
+  final String text;
+  final SignatureFont font;
+  final Color ink;
   final bool selected;
   final VoidCallback onTap;
 
@@ -267,62 +378,66 @@ class _StylePreviewCard extends StatelessWidget {
     return PressableScale(
       onTap: onTap,
       borderRadius: BorderRadius.circular(AppRadii.sm),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.sm,
-          AppSpacing.md,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accentPurple.withValues(alpha: 0.06)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(
+            color: selected ? AppColors.accentPurple : AppColors.divider,
+            width: selected ? 2 : 1,
+          ),
+          boxShadow: selected ? AppShadows.elevated : null,
         ),
-        decoration: selected
-            ? AppDecorations.card(
-                radius: AppRadii.sm,
-                color: const Color(0xFF4A3A72),
-                prominent: true,
-                sheen: false,
-              ).copyWith(
-                border: Border.all(color: AppColors.accentPurple, width: 1.6),
-                boxShadow: AppShadows.elevated,
-              )
-            : AppDecorations.card(radius: AppRadii.sm),
-        child: Row(
+        child: Stack(
           children: [
-            Expanded(
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Expanded(
+                    child: Center(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          text,
+                          maxLines: 1,
+                          style: font.style(fontSize: 30, color: ink),
+                        ),
+                      ),
+                    ),
+                  ),
                   Text(
-                    styleLabel,
+                    font.family,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                     style: AppTextStyles.labelMedium.copyWith(
                       fontSize: 10,
                       color: selected
-                          ? AppColors.accentPurple
+                          ? AppColors.accentPurpleDark
                           : AppColors.textSecondary,
-                      letterSpacing: 0.4,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textStyle,
                   ),
                 ],
               ),
             ),
             if (selected)
-              Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(
-                  color: AppColors.accentPurple,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check_rounded,
-                  color: AppColors.textOnAccent,
-                  size: 18,
+              const Positioned(
+                top: 6,
+                right: 6,
+                child: CircleAvatar(
+                  radius: 10,
+                  backgroundColor: AppColors.accentPurple,
+                  child: Icon(
+                    Icons.check_rounded,
+                    size: 14,
+                    color: AppColors.textOnAccent,
+                  ),
                 ),
               ),
           ],

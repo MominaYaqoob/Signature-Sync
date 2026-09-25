@@ -44,10 +44,15 @@ dependencies:
   image: ^4.2.0
   image_picker: ^1.1.2
   image_cropper: ^8.0.2
-  file_picker: ^8.1.2
+  file_picker: ^10.3.3
   pdfx: ^2.6.0
   signature:
     path: packages/signature
+  pdf: ^3.13.1
+  share_plus: ^12.0.2
+  url_launcher: ^6.3.2
+  google_mobile_ads: ^9.1.0
+  package_info_plus: ^9.0.1
 
 dev_dependencies:
   flutter_test:
@@ -79,3 +84,7 @@ flutter:
   assets:
     - assets/illustrations/
     - assets/branding/
+    # Bundled so fonts work offline / in release builds (google_fonts loads
+    # these instead of fetching). Files come from github.com/google/fonts.
+    - assets/google_fonts/
+    - assets/google_fonts/licenses/

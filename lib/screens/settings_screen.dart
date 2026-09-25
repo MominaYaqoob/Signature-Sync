@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
@@ -13,12 +14,24 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool _darkMode = true;
-
   void _toast(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _openStoreListing() async {
+    // Package id from android/app/build.gradle.kts; the Play Store page
+    // only exists once the app is published, so a launch failure (not
+    // yet listed, no store app installed, etc.) falls back to a message
+    // instead of a silent no-op.
+    final uri = Uri.parse(
+      'https://play.google.com/store/apps/details?id=com.signaturesync.signature_sync',
+    );
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      _toast('Could not open the Play Store on this device.');
+    }
   }
 
   Future<void> _confirmClearData() async {
@@ -94,27 +107,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             child: Column(
               children: [
-          _SettingsCard(
-              child: _SettingsRow(
-                icon: Icons.dark_mode_outlined,
-                label: 'Dark mode',
-                trailing: Switch.adaptive(
-                  value: _darkMode,
-                  activeThumbColor: AppColors.textOnAccent,
-                  activeTrackColor: AppColors.accentBlue,
-                  inactiveThumbColor: AppColors.textSecondary,
-                  inactiveTrackColor: AppColors.altCardBackground,
-                  onChanged: (value) {
-                    setState(() => _darkMode = value);
-                    if (!value) {
-                      _toast('Light mode coming soon — staying on dark theme');
-                      setState(() => _darkMode = true);
-                    }
-                  },
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
             _SettingsCard(
               onTap: () => context.go('/signatures'),
               child: const _SettingsRow(
@@ -128,7 +120,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 10),
             _SettingsCard(
-              onTap: () => _toast('Thanks for your support!'),
+              onTap: _openStoreListing,
               child: const _SettingsRow(
                 icon: Icons.star_outline_rounded,
                 label: 'Rate the app',

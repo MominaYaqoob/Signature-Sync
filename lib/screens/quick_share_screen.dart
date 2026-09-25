@@ -1,12 +1,16 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../models/document_model.dart';
 import '../models/signature_model.dart';
+import '../services/document_signer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/signature_actions.dart' show kDeleteRed;
 import '../widgets/signature_visual.dart';
 
 String _shortDate(DateTime d) {
@@ -22,6 +26,14 @@ class QuickShareScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuilds when a document is saved/deleted elsewhere in the app.
+    return ValueListenableBuilder(
+      valueListenable: StorageService.documentsListenable,
+      builder: (context, _, _) => _buildContent(context),
+    );
+  }
+
+  Widget _buildContent(BuildContext context) {
     final signatures = StorageService.getAllSignatures();
     final defaultSig = StorageService.getDefaultSignature() ??
         (signatures.isNotEmpty ? signatures.first : null);
@@ -109,7 +121,8 @@ class QuickShareScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Tap a document to apply your default signature (UI only).',
+                    'Tap a document to stamp your default signature onto '
+                    'it near the bottom-right corner.',
                     style: AppTextStyles.secondary.copyWith(fontSize: 13),
                   ),
                   const SizedBox(height: AppSpacing.sm),
@@ -223,7 +236,10 @@ class _ShareDocumentTile extends StatelessWidget {
   }
 }
 
-class QuickShareSuccessScreen extends StatelessWidget {
+/// Re-stamps [signature] onto [document] near the bottom-right corner (a
+/// fixed placement, since there's no Place-screen step in this shortcut)
+/// and saves the result as a new signed document.
+class QuickShareSuccessScreen extends StatefulWidget {
   const QuickShareSuccessScreen({
     super.key,
     this.document,
@@ -234,9 +250,86 @@ class QuickShareSuccessScreen extends StatelessWidget {
   final SignatureModel? signature;
 
   @override
+  State<QuickShareSuccessScreen> createState() =>
+      _QuickShareSuccessScreenState();
+}
+
+enum _QuickShareStatus { working, error, done }
+
+/// Fixed bottom-right placement used since this shortcut has no drag/resize
+/// step of its own.
+const _quickShareStamp = StampPlacement(
+  pageIndex: 0,
+  xFrac: 0.55,
+  yFrac: 0.80,
+  widthFrac: 0.35,
+  heightFrac: 0.10,
+  rotationRadians: 0,
+);
+
+class _QuickShareSuccessScreenState extends State<QuickShareSuccessScreen> {
+  _QuickShareStatus _status = _QuickShareStatus.working;
+  String? _error;
+  bool _ready = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_ready) return;
+    _ready = true;
+    _run();
+  }
+
+  Future<void> _run() async {
+    final document = widget.document;
+    final signature = widget.signature;
+    final path = document?.filePath;
+    if (document == null ||
+        signature == null ||
+        path == null ||
+        path.isEmpty ||
+        !File(path).existsSync()) {
+      setState(() {
+        _status = _QuickShareStatus.error;
+        _error = 'This document or signature is no longer available.';
+      });
+      return;
+    }
+
+    try {
+      final result = await buildSignedDocument(
+        sourcePath: path,
+        fileType: document.fileType.name,
+        pageCount: document.pageCount,
+        placement: _quickShareStamp,
+        signature: signature,
+      );
+      final updated = DocumentModel(
+        id: 'doc_${DateTime.now().millisecondsSinceEpoch}',
+        title: document.title,
+        status: DocumentStatus.signed,
+        updatedAt: DateTime.now(),
+        pageCount: document.pageCount,
+        signerName: signature.name,
+        fileType: document.fileType,
+        filePath: result.filePath,
+      );
+      await StorageService.saveDocument(updated);
+      if (!mounted) return;
+      setState(() => _status = _QuickShareStatus.done);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _status = _QuickShareStatus.error;
+        _error = 'Could not apply the signature: $e';
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final docTitle = document?.title ?? 'Document';
-    final sigName = signature?.name ?? 'Signature';
+    final docTitle = widget.document?.title ?? 'Document';
+    final sigName = widget.signature?.name ?? 'Signature';
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
@@ -262,8 +355,13 @@ class QuickShareSuccessScreen extends StatelessWidget {
                 decoration: AppDecorations.card(
                   radius: AppRadii.xl,
                   prominent: true,
-                  color: AppColors.softBlue,
-                  borderColor: AppColors.accentBlue.withValues(alpha: 0.25),
+                  color: _status == _QuickShareStatus.error
+                      ? AppColors.softDanger
+                      : AppColors.softBlue,
+                  borderColor: (_status == _QuickShareStatus.error
+                          ? kDeleteRed
+                          : AppColors.accentBlue)
+                      .withValues(alpha: 0.25),
                 ),
                 child: Column(
                   children: [
@@ -271,23 +369,44 @@ class QuickShareSuccessScreen extends StatelessWidget {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: AppColors.accentBlue.withValues(alpha: 0.18),
+                        color: (_status == _QuickShareStatus.error
+                                ? kDeleteRed
+                                : AppColors.accentBlue)
+                            .withValues(alpha: 0.18),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.check_rounded,
-                        color: AppColors.accentBlue,
-                        size: 34,
-                      ),
+                      child: _status == _QuickShareStatus.working
+                          ? const Padding(
+                              padding: EdgeInsets.all(18),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: AppColors.accentBlue,
+                              ),
+                            )
+                          : Icon(
+                              _status == _QuickShareStatus.error
+                                  ? Icons.error_outline_rounded
+                                  : Icons.check_rounded,
+                              color: _status == _QuickShareStatus.error
+                                  ? kDeleteRed
+                                  : AppColors.accentBlue,
+                              size: 34,
+                            ),
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
-                      'Signature applied',
+                      switch (_status) {
+                        _QuickShareStatus.working => 'Applying signature…',
+                        _QuickShareStatus.error => 'Could not apply signature',
+                        _QuickShareStatus.done => 'Signature applied',
+                      },
                       style: AppTextStyles.headlineMedium,
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     Text(
-                      '“$sigName” was applied to\n$docTitle',
+                      _status == _QuickShareStatus.error
+                          ? (_error ?? 'Something went wrong.')
+                          : '“$sigName” was applied to\n$docTitle',
                       textAlign: TextAlign.center,
                       style: AppTextStyles.secondary,
                     ),
@@ -319,14 +438,18 @@ class QuickShareSuccessScreen extends StatelessWidget {
               SizedBox(
                 height: 48,
                 child: PressableScale(
-                  onTap: () => context.go('/documents'),
+                  onTap: _status == _QuickShareStatus.done
+                      ? () => context.go('/documents')
+                      : () {},
                   borderRadius: BorderRadius.circular(AppRadii.sm),
                   child: Center(
                     child: Text(
                       'View documents',
                       style: AppTextStyles.bodyMedium.copyWith(
                         fontWeight: FontWeight.w600,
-                        color: AppColors.accentPurple,
+                        color: _status == _QuickShareStatus.done
+                            ? AppColors.accentPurple
+                            : AppColors.textSecondary,
                       ),
                     ),
                   ),

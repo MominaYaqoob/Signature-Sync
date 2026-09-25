@@ -19,12 +19,13 @@ import '../screens/sign_success_screen.dart';
 import '../screens/sign_upload_screen.dart';
 import '../screens/signatures_screen.dart';
 import '../screens/splash_screen.dart';
-import '../screens/templates_screen.dart';
+import '../screens/signature_generator_screen.dart';
 import '../screens/save_signature_screen.dart';
 import '../screens/quick_share_screen.dart';
 import '../screens/signature_detail_screen.dart';
 import '../screens/privacy_policy_screen.dart';
 import '../screens/about_screen.dart';
+import '../screens/agree_screen.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
@@ -45,6 +46,11 @@ GoRouter createAppRouter() {
         builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
+        path: '/agree',
+        name: 'agree',
+        builder: (context, state) => const AgreeScreen(),
+      ),
+      GoRoute(
         path: '/draw-signature',
         name: 'drawSignature',
         parentNavigatorKey: _rootNavigatorKey,
@@ -63,10 +69,10 @@ GoRouter createAppRouter() {
         builder: (context, state) => const AutoSignatureScreen(),
       ),
       GoRoute(
-        path: '/templates',
-        name: 'templates',
+        path: '/signature-generator',
+        name: 'signatureGenerator',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const TemplatesScreen(),
+        builder: (context, state) => const SignatureGeneratorScreen(),
       ),
       GoRoute(
         path: '/save-signature',
