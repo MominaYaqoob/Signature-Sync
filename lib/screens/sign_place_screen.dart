@@ -9,8 +9,10 @@ import 'package:pdfx/pdfx.dart';
 
 import '../models/signature_model.dart';
 import '../services/ads_service.dart';
+import '../services/document_signer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
+import '../widgets/date_stamp_style_picker.dart';
 import '../widgets/help_screen.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/signature_visual.dart';
@@ -47,6 +49,12 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
   Size _stampSize = const Size(160, 64);
   double _rotation = 0;
   Size? _docSize;
+
+  bool _addDate = false;
+  DateStampStyle _dateStyle = DateStampStyle.plain;
+  Offset? _datePosition;
+  final Size _dateSize = const Size(168, 28);
+  late final String _dateText = formatDateStampText(DateTime.now());
 
   @override
   void didChangeDependencies() {
@@ -249,6 +257,15 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
           'heightFrac': (_stampSize.height / docSize.height).clamp(0, 1),
           'rotationRadians': _rotation,
         },
+      if (_addDate && docSize != null && _datePosition != null)
+        'dateStamp': <String, Object?>{
+          'xFrac': (_datePosition!.dx / docSize.width).clamp(0, 1),
+          'yFrac': (_datePosition!.dy / docSize.height).clamp(0, 1),
+          'widthFrac': (_dateSize.width / docSize.width).clamp(0, 1),
+          'heightFrac': (_dateSize.height / docSize.height).clamp(0, 1),
+          'style': _dateStyle.name,
+          'text': _dateText,
+        },
     };
 
     // End of the sign-document flow — one of the app's ad plan placements.
@@ -353,6 +370,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
               ),
             ),
             if (_pageCount > 1) _buildPageStrip(),
+            if (_signatures.isNotEmpty) _buildDateControls(),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
@@ -397,6 +415,64 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildDateControls() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              FilterChip(
+                selected: _addDate,
+                label: const Text('Add date'),
+                onSelected: (v) {
+                  setState(() {
+                    _addDate = v;
+                    if (v && _datePosition == null && _docSize != null) {
+                      final sig = _position ??
+                          Offset(_docSize!.width * 0.1, _docSize!.height * 0.62);
+                      _datePosition = Offset(
+                        sig.dx,
+                        (sig.dy + _stampSize.height + 8)
+                            .clamp(0, _docSize!.height - _dateSize.height),
+                      );
+                    }
+                  });
+                },
+                selectedColor: AppColors.accentPurple.withValues(alpha: 0.18),
+                checkmarkColor: AppColors.accentPurpleDark,
+                labelStyle: AppTextStyles.labelMedium.copyWith(
+                  color: _addDate
+                      ? AppColors.accentPurpleDark
+                      : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (_addDate)
+                Expanded(
+                  child: Text(
+                    _dateText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextStyles.bodySmall,
+                  ),
+                ),
+            ],
+          ),
+          if (_addDate) ...[
+            const SizedBox(height: 8),
+            DateStampStylePicker(
+              selected: _dateStyle,
+              onSelect: (s) => setState(() => _dateStyle = s),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -552,10 +628,69 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
                       ),
                     ),
                   ),
+                if (_addDate && _signatures.isNotEmpty) _buildDateStamp(size),
               ],
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildDateStamp(Size docSize) {
+    _datePosition ??= Offset(
+      (_position?.dx ?? docSize.width * 0.1),
+      ((_position?.dy ?? docSize.height * 0.62) + _stampSize.height + 8)
+          .clamp(0, docSize.height - _dateSize.height),
+    );
+    final maxLeft = math.max(0.0, docSize.width - _dateSize.width);
+    final maxTop = math.max(0.0, docSize.height - _dateSize.height);
+    final datePos = Offset(
+      _datePosition!.dx.clamp(0, maxLeft),
+      _datePosition!.dy.clamp(0, maxTop),
+    );
+    final label = _dateStyle == DateStampStyle.signedOn
+        ? 'Signed on: $_dateText'
+        : _dateText;
+
+    return Positioned(
+      left: datePos.dx,
+      top: datePos.dy,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          setState(() => _datePosition = datePos + details.delta);
+        },
+        child: Container(
+          width: _dateSize.width,
+          height: _dateSize.height,
+          alignment: Alignment.centerLeft,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.55),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: _dateStyle == DateStampStyle.boxed
+                  ? AppColors.accentBlue
+                  : AppColors.accentBlue.withValues(alpha: 0.45),
+              width: _dateStyle == DateStampStyle.boxed ? 1.4 : 1,
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.navy,
+              fontSize: _dateSize.height * 0.42,
+              fontStyle: _dateStyle == DateStampStyle.cursive
+                  ? FontStyle.italic
+                  : FontStyle.normal,
+              fontWeight: _dateStyle == DateStampStyle.plain
+                  ? FontWeight.w500
+                  : FontWeight.w600,
+            ),
+          ),
+        ),
       ),
     );
   }

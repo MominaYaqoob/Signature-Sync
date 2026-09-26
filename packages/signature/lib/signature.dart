@@ -14,12 +14,12 @@ class Signature extends StatefulWidget {
   /// constructor
   const Signature({
     required this.controller,
-    Key? key,
+    super.key,
     this.backgroundColor = Colors.grey,
     this.dynamicPressureSupported = false,
     this.width,
     this.height,
-  }) : super(key: key);
+  });
 
   /// signature widget controller
   final SignatureController controller;
@@ -156,14 +156,14 @@ class SignatureState extends State<Signature> {
 
     // IF WIDGET IS USED WITHOUT DIMENSIONS, WE WILL FALLBACK TO SCREENSIZE
     // DIMENSIONS
-    final double _maxSafeWidth =
+    final double maxSafeWidth =
         maxWidth == double.infinity ? screenSize!.width : maxWidth;
-    final double _maxSafeHeight =
+    final double maxSafeHeight =
         maxHeight == double.infinity ? screenSize!.height : maxHeight;
 
     //SAVE POINT ONLY IF IT IS IN THE SPECIFIED BOUNDARIES
-    if ((screenSize?.width == null || o.dx > 0 && o.dx < _maxSafeWidth) &&
-        (screenSize?.height == null || o.dy > 0 && o.dy < _maxSafeHeight)) {
+    if ((screenSize?.width == null || o.dx > 0 && o.dx < maxSafeWidth) &&
+        (screenSize?.height == null || o.dy > 0 && o.dy < maxSafeHeight)) {
       // IF USER LEFT THE BOUNDARY AND ALSO RETURNED BACK
       // IN ONE MOVE, RETYPE IT AS TAP, AS WE DO NOT WANT TO
       // LINK IT WITH PREVIOUS POINT
@@ -544,18 +544,19 @@ class SignatureController extends ValueNotifier<List<Point>> {
       );
     }
 
+    final Color pen = exportPenColor ?? penColor;
     final img.Color pColor = img.ColorRgb8(
-      exportPenColor?.red ?? penColor.red,
-      exportPenColor?.green ?? penColor.green,
-      exportPenColor?.blue ?? penColor.blue,
+      (pen.r * 255.0).round().clamp(0, 255),
+      (pen.g * 255.0).round().clamp(0, 255),
+      (pen.b * 255.0).round().clamp(0, 255),
     );
 
     final Color backgroundColor = exportBackgroundColor ?? Colors.transparent;
     final img.Color bColor = img.ColorRgba8(
-      backgroundColor.red,
-      backgroundColor.green,
-      backgroundColor.blue,
-      backgroundColor.alpha.toInt(),
+      (backgroundColor.r * 255.0).round().clamp(0, 255),
+      (backgroundColor.g * 255.0).round().clamp(0, 255),
+      (backgroundColor.b * 255.0).round().clamp(0, 255),
+      (backgroundColor.a * 255.0).round().clamp(0, 255),
     );
 
     final List<Point> translatedPoints = _translatePoints(points)!;
@@ -649,12 +650,15 @@ class SignatureController extends ValueNotifier<List<Point>> {
   }
 
   /// Converts color to its hex representation without alpha
-  String _colorToHex(Color c) => '#${c.red.toRadixString(16).padLeft(2, '0')}'
-      '${c.green.toRadixString(16).padLeft(2, '0')}'
-      '${c.blue.toRadixString(16).padLeft(2, '0')}';
+  String _colorToHex(Color c) {
+    final r = (c.r * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
+    final g = (c.g * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
+    final b = (c.b * 255.0).round().clamp(0, 255).toRadixString(16).padLeft(2, '0');
+    return '#$r$g$b';
+  }
 
   /// Extracts alpha from color
-  double _colorToOpacity(Color c) => c.opacity;
+  double _colorToOpacity(Color c) => c.a;
 
   /// Export the current content to a SVG graphic.
   /// Will return `null` if there are no points.

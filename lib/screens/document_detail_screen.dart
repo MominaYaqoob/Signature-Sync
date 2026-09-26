@@ -58,8 +58,23 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
       );
       return;
     }
+    final title = _doc?.title ?? 'Signed document';
+    final label = 'Signed document: $title';
+    final ext = _doc!.isPdf ? '.pdf' : '.png';
+    final safe = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    final name = '${safe.isEmpty ? 'Signed document' : safe}$ext';
     await SharePlus.instance.share(
-      ShareParams(files: [XFile(path)], subject: _doc?.title),
+      ShareParams(
+        files: [
+          XFile(
+            path,
+            name: name,
+            mimeType: _doc!.isPdf ? 'application/pdf' : 'image/png',
+          ),
+        ],
+        subject: label,
+        text: label,
+      ),
     );
   }
 

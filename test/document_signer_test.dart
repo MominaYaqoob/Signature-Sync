@@ -16,11 +16,12 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('compositeStampOnImage', () {
-    test('places an opaque stamp at the requested fractional position', () {
+    test('places an opaque stamp at the requested fractional position',
+        () async {
       final base = _solidImage(200, 200, img.ColorRgba8(255, 255, 255, 255));
       final stamp = _solidImage(20, 20, img.ColorRgba8(255, 0, 0, 255));
 
-      final result = compositeStampOnImage(
+      final result = await compositeStampOnImage(
         baseBytes: Uint8List.fromList(img.encodePng(base)),
         stampBytes: Uint8List.fromList(img.encodePng(stamp)),
         placement: const StampPlacement(
@@ -46,11 +47,11 @@ void main() {
       expect(corner.b, 255);
     });
 
-    test('a transparent stamp does not paint over the page', () {
+    test('a transparent stamp does not paint over the page', () async {
       final base = _solidImage(100, 100, img.ColorRgba8(255, 255, 255, 255));
       final stamp = _solidImage(20, 20, img.ColorRgba8(0, 0, 0, 0));
 
-      final result = compositeStampOnImage(
+      final result = await compositeStampOnImage(
         baseBytes: Uint8List.fromList(img.encodePng(base)),
         stampBytes: Uint8List.fromList(img.encodePng(stamp)),
         placement: const StampPlacement(

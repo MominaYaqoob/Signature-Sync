@@ -53,6 +53,9 @@ dependencies:
   url_launcher: ^6.3.2
   google_mobile_ads: ^9.1.0
   package_info_plus: ^9.0.1
+  # Overlay stamps on existing PDF pages without flattening text.
+  # ^34+ aligns with pdf's xml ^7 dependency (older Syncfusion pins xml ^6).
+  syncfusion_flutter_pdf: ^34.2.9
 
 dev_dependencies:
   flutter_test:

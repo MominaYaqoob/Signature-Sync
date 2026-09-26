@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../debug_agent_log.dart';
+
 /// Google's published Android TEST ad unit ids — always resolve, never fill
 /// with real (paid) creatives. Swap these for real AdMob unit ids before
 /// release. Android-only: this app doesn't target iOS.
@@ -47,8 +49,26 @@ class AdsService with WidgetsBindingObserver {
   /// once, early in `main()`.
   Future<void> initialize() async {
     if (_initialized) return;
+    // #region agent log
+    agentLog('A', 'ads_service.dart:initialize', 'mobile_ads_initialize_before');
+    // #endregion
+    // Do NOT set _initialized before initialize() succeeds — a failed /
+    // half-done init must not permanently disable ads for this process.
+    try {
+      await MobileAds.instance.initialize();
+    } catch (e, st) {
+      // #region agent log
+      agentLog('A', 'ads_service.dart:initialize', 'mobile_ads_initialize_threw', {
+        'error': e.toString(),
+        'stack': st.toString(),
+      });
+      // #endregion
+      rethrow;
+    }
+    // #region agent log
+    agentLog('A', 'ads_service.dart:initialize', 'mobile_ads_initialize_after');
+    // #endregion
     _initialized = true;
-    await MobileAds.instance.initialize();
     WidgetsBinding.instance.addObserver(this);
     _loadAppOpenAd();
     _loadInterstitialAd();
@@ -104,6 +124,12 @@ class AdsService with WidgetsBindingObserver {
   /// (e.g. on every resume) — it's a no-op otherwise.
   void showAppOpenAdIfAvailable() {
     final ad = _appOpenAd;
+    // #region agent log
+    agentLog('D', 'ads_service.dart:showAppOpen', 'show_app_open_called', {
+      'showingAd': _showingAd,
+      'hasAd': ad != null,
+    });
+    // #endregion
     if (_showingAd || ad == null) return;
 
     final shownAt = _appOpenAdShownAt;

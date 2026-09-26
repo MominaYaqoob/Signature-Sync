@@ -80,8 +80,16 @@ SignatureFont? signatureFontByLabel(String? label) {
 }
 
 /// Ink colours offered for typed signatures (stored as ARGB ints).
+/// Dark / muted professional inks — not neon or pastel.
 const kInkColors = <({String label, Color color})>[
   (label: 'Black', color: Color(0xFF111111)),
-  (label: 'Blue', color: Color(0xFF1D4ED8)),
+  (label: 'Charcoal', color: Color(0xFF374151)),
   (label: 'Navy', color: Color(0xFF1A2744)),
+  (label: 'Royal Blue', color: Color(0xFF1E3A8A)),
+  (label: 'Teal', color: Color(0xFF0F766E)),
+  (label: 'Forest', color: Color(0xFF14532D)),
+  (label: 'Burgundy', color: Color(0xFF7F1D1D)),
+  (label: 'Wine', color: Color(0xFF881337)),
+  (label: 'Deep Purple', color: Color(0xFF4C1D95)),
+  (label: 'Bronze', color: Color(0xFF92400E)),
 ];

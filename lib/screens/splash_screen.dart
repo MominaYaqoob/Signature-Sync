@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../debug_agent_log.dart';
 import '../services/ads_service.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
@@ -22,6 +23,9 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
+    // #region agent log
+    agentLog('E', 'splash_screen.dart:initState', 'splash_built');
+    // #endregion
     _progressController = AnimationController(vsync: this, duration: _duration)
       ..forward();
 
@@ -35,6 +39,11 @@ class _SplashScreenState extends State<SplashScreen>
       } catch (_) {
         // Fall through to onboarding.
       }
+      // #region agent log
+      agentLog('D', 'splash_screen.dart:navigate', 'splash_navigate', {
+        'alreadyOnboarded': alreadyOnboarded,
+      });
+      // #endregion
       context.go(alreadyOnboarded ? '/home' : '/onboarding');
       // Cold-start placement, per the app's ad plan; skipped on web (no
       // google_mobile_ads implementation there).

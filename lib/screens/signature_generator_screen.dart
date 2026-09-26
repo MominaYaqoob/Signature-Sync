@@ -69,11 +69,10 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
   void _regenerate() {
     _lastMultiWord = _multiWord;
     setState(() {
-      _designs = List.generate(
-        _designCount,
-        (_) => AutographSpec.random(_random, multiWord: _multiWord),
-      );
+      _designs = _uniqueDesignBatch(_designCount, multiWord: _multiWord);
       _selected = 0;
+      // Keep ink index valid if the palette size changed across hot reloads.
+      if (_inkIndex >= kInkColors.length) _inkIndex = 0;
     });
     // Show the fresh designs from the top (selection resets to the first).
     if (_scrollController.hasClients) {
@@ -90,11 +89,59 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
     });
   }
 
+  /// Six designs with distinct font+layout pairs when possible.
+  List<AutographSpec> _uniqueDesignBatch(int count,
+      {required bool multiWord}) {
+    final designs = <AutographSpec>[];
+    final used = <String>{};
+    var attempts = 0;
+    while (designs.length < count && attempts < count * 24) {
+      attempts++;
+      final spec = AutographSpec.random(_random, multiWord: multiWord);
+      final key = '${spec.font.family}|${spec.layout.name}';
+      if (used.contains(key)) continue;
+      used.add(key);
+      designs.add(spec);
+    }
+    while (designs.length < count) {
+      designs.add(AutographSpec.random(_random, multiWord: multiWord));
+    }
+    return designs;
+  }
+
   void _setSwash(AutographSwash swash) {
     if (_designs.isEmpty || _designs[_selected].swash == swash) return;
     setState(() {
       _designs = [..._designs];
-      _designs[_selected] = _designs[_selected].copyWith(swash: swash);
+      // Reset position when clearing the flourish; keep it when switching styles.
+      _designs[_selected] = _designs[_selected].copyWith(
+        swash: swash,
+        swashPosition: swash == AutographSwash.none
+            ? AutographSwashPosition.below
+            : null,
+      );
+    });
+  }
+
+  void _setSwashPosition(AutographSwashPosition position) {
+    if (_designs.isEmpty ||
+        _designs[_selected].swashPosition == position) {
+      return;
+    }
+    setState(() {
+      _designs = [..._designs];
+      _designs[_selected] =
+          _designs[_selected].copyWith(swashPosition: position);
+    });
+  }
+
+  void _setStrokeTaper(AutographStrokeTaper taper) {
+    if (_designs.isEmpty || _designs[_selected].strokeTaper == taper) {
+      return;
+    }
+    setState(() {
+      _designs = [..._designs];
+      _designs[_selected] = _designs[_selected].copyWith(strokeTaper: taper);
     });
   }
 
@@ -177,10 +224,73 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
                   const SizedBox(height: AppSpacing.md),
                   SignatureNameField(controller: _nameController),
                   const SizedBox(height: AppSpacing.md),
+                  Text(
+                    'STYLE',
+                    style: AppTextStyles.eyebrow.copyWith(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.6,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Choose ink and flourishes, then pick a design below.',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   InkPicker(
                     selected: _inkIndex,
                     onSelect: (i) => setState(() => _inkIndex = i),
                   ),
+                  if (hasName && _designs.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Stroke style',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _StrokeTaperPicker(
+                      selected: _designs[_selected].strokeTaper,
+                      onSelect: _setStrokeTaper,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Swash style',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.textSecondary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _SwashPicker(
+                      selected: _designs[_selected].swash,
+                      ink: _ink,
+                      onSelect: _setSwash,
+                    ),
+                    if (_designs[_selected].swash != AutographSwash.none) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      Text(
+                        'Swash position',
+                        style: AppTextStyles.labelMedium.copyWith(
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '“Through” is a soft under-stroke — preview before using.',
+                        style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      _SwashPositionPicker(
+                        selected: _designs[_selected].swashPosition,
+                        onSelect: _setSwashPosition,
+                      ),
+                    ],
+                  ],
                   const SizedBox(height: AppSpacing.lg),
                   if (!hasName)
                     const _EmptyHint()
@@ -211,26 +321,6 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
                         onTap: () => setState(() => _selected = i),
                       ),
                     ],
-                    const SizedBox(height: AppSpacing.lg),
-                    Text(
-                      'SWASH STYLE',
-                      style: AppTextStyles.eyebrow.copyWith(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1.6,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Fine-tune the flourish under the selected design.',
-                      style: AppTextStyles.bodySmall,
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _SwashPicker(
-                      selected: _designs[_selected].swash,
-                      ink: _ink,
-                      onSelect: _setSwash,
-                    ),
                   ],
                 ],
               ),
@@ -460,6 +550,186 @@ class _SwashPicker extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SwashPositionPicker extends StatelessWidget {
+  const _SwashPositionPicker({
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final AutographSwashPosition selected;
+  final ValueChanged<AutographSwashPosition> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: AutographSwashPosition.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
+        itemBuilder: (context, index) {
+          final position = AutographSwashPosition.values[index];
+          final isSelected = position == selected;
+          return PressableScale(
+            onTap: () => onSelect(position),
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.accentPurple.withValues(alpha: 0.08)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                border: Border.all(
+                  color:
+                      isSelected ? AppColors.accentPurple : AppColors.divider,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Text(
+                position.label,
+                style: AppTextStyles.labelMedium.copyWith(
+                  fontSize: 11,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected
+                      ? AppColors.accentPurpleDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StrokeTaperPicker extends StatelessWidget {
+  const _StrokeTaperPicker({
+    required this.selected,
+    required this.onSelect,
+  });
+
+  final AutographStrokeTaper selected;
+  final ValueChanged<AutographStrokeTaper> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 76,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: AutographStrokeTaper.values.length,
+        separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.xs),
+        itemBuilder: (context, index) {
+          final taper = AutographStrokeTaper.values[index];
+          final isSelected = taper == selected;
+          return PressableScale(
+            onTap: () => onSelect(taper),
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              width: 72,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.accentPurple.withValues(alpha: 0.08)
+                    : Colors.white,
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                border: Border.all(
+                  color:
+                      isSelected ? AppColors.accentPurple : AppColors.divider,
+                  width: isSelected ? 2 : 1,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 48,
+                    height: 30,
+                    child: CustomPaint(
+                      painter: _StrokeTaperPreviewPainter(
+                        taper: taper,
+                        color: isSelected
+                            ? AppColors.accentPurpleDark
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    taper.label,
+                    style: AppTextStyles.labelMedium.copyWith(
+                      fontSize: 9,
+                      fontWeight:
+                          isSelected ? FontWeight.w700 : FontWeight.w500,
+                      color: isSelected
+                          ? AppColors.accentPurpleDark
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _StrokeTaperPreviewPainter extends CustomPainter {
+  _StrokeTaperPreviewPainter({required this.taper, required this.color});
+
+  final AutographStrokeTaper taper;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width * 0.08, size.height * 0.55)
+      ..quadraticBezierTo(
+        size.width * 0.45,
+        size.height * 0.15,
+        size.width * 0.92,
+        size.height * 0.5,
+      );
+    final metrics = path.computeMetrics();
+    for (final metric in metrics) {
+      const n = 16;
+      for (var i = 0; i < n; i++) {
+        final t0 = i / n;
+        final t1 = (i + 1) / n;
+        final segment =
+            metric.extractPath(metric.length * t0, metric.length * t1);
+        final t = (t0 + t1) / 2;
+        final factor = switch (taper) {
+          AutographStrokeTaper.none => 1.0,
+          AutographStrokeTaper.thickToThin => 1.4 - t,
+          AutographStrokeTaper.thinToThick => 0.4 + t,
+          AutographStrokeTaper.thickMiddle =>
+            0.45 + (1 - (t - 0.5).abs() * 2) * 0.95,
+        };
+        canvas.drawPath(
+          segment,
+          Paint()
+            ..color = color
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2.4 * factor
+            ..strokeCap = StrokeCap.round
+            ..isAntiAlias = true,
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _StrokeTaperPreviewPainter oldDelegate) =>
+      oldDelegate.taper != taper || oldDelegate.color != color;
 }
 
 class _SwashPreviewPainter extends CustomPainter {

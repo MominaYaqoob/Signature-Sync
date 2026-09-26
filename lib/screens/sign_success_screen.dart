@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -19,82 +20,134 @@ class SignSuccessScreen extends StatefulWidget {
   State<SignSuccessScreen> createState() => _SignSuccessScreenState();
 }
 
-enum _Status { working, error, done }
+enum _Status { naming, working, error, done }
 
 class _SignSuccessScreenState extends State<SignSuccessScreen> {
-  _Status _status = _Status.working;
+  _Status _status = _Status.naming;
   String? _error;
   DocumentModel? _document;
+  Uint8List? _previewPng;
   bool _ready = false;
+  final _nameController = TextEditingController();
+  String _fileType = 'pdf';
+  String _sourcePath = '';
+  int _pageIndex = 0;
+  int _pageCount = 1;
+  String _signatureId = '';
+  Map<Object?, Object?>? _stampRaw;
+  Map<Object?, Object?>? _dateStampRaw;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_ready) return;
     _ready = true;
-    _run();
+    _prepareNaming();
   }
 
-  Future<void> _run() async {
+  void _prepareNaming() {
     final extra = GoRouterState.of(context).extra;
     final data = extra is Map ? extra : const <Object?, Object?>{};
 
-    final filePath = data['filePath'] as String? ?? '';
-    final fileType = data['fileType'] as String? ?? 'pdf';
-    final pageIndex = (data['pageIndex'] as num?)?.toInt() ?? 0;
-    final pageCount = (data['pageCount'] as num?)?.toInt() ?? 1;
-    final signatureId = data['signatureId'] as String? ?? '';
+    _sourcePath = data['filePath'] as String? ?? '';
+    _fileType = data['fileType'] as String? ?? 'pdf';
+    _pageIndex = (data['pageIndex'] as num?)?.toInt() ?? 0;
+    _pageCount = (data['pageCount'] as num?)?.toInt() ?? 1;
+    _signatureId = data['signatureId'] as String? ?? '';
     final stampRaw = data['stamp'];
+    _stampRaw = stampRaw is Map ? stampRaw.cast<Object?, Object?>() : null;
+    final dateRaw = data['dateStamp'];
+    _dateStampRaw = dateRaw is Map ? dateRaw.cast<Object?, Object?>() : null;
 
-    if (filePath.isEmpty || !File(filePath).existsSync()) {
+    final stem = _sourcePath
+        .split(Platform.pathSeparator)
+        .last
+        .replaceAll(RegExp(r'\.[^.]+$'), '');
+    final defaultName =
+        stem.isEmpty ? 'Signed document' : '$stem - Signed';
+    _nameController.text = defaultName;
+
+    if (_sourcePath.isEmpty || !File(_sourcePath).existsSync()) {
       setState(() {
         _status = _Status.error;
         _error = 'The original document could not be found.';
       });
       return;
     }
-    final signature = StorageService.getSignatureById(signatureId);
-    if (signature == null) {
+    if (StorageService.getSignatureById(_signatureId) == null) {
       setState(() {
         _status = _Status.error;
         _error = 'The selected signature could not be found.';
       });
       return;
     }
-    if (stampRaw is! Map) {
+    if (_stampRaw == null) {
       setState(() {
         _status = _Status.error;
         _error = 'Signature placement was lost — please place it again.';
       });
       return;
     }
+    setState(() => _status = _Status.naming);
+  }
+
+  Future<void> _confirmNameAndSign() async {
+    if (_status == _Status.working) return;
+    setState(() => _status = _Status.working);
+
+    final signature = StorageService.getSignatureById(_signatureId);
+    final stampRaw = _stampRaw;
+    if (signature == null || stampRaw == null) {
+      setState(() {
+        _status = _Status.error;
+        _error = 'Something went wrong — please try signing again.';
+      });
+      return;
+    }
 
     try {
-      final placement = StampPlacement.fromMap(
-        stampRaw.cast<Object?, Object?>(),
-        pageIndex,
-      );
+      final placement = StampPlacement.fromMap(stampRaw, _pageIndex);
+      final datePlacement = _dateStampRaw == null
+          ? null
+          : DateStampPlacement.fromMap(_dateStampRaw!, _pageIndex);
+      final preferred = _nameController.text.trim();
       final result = await buildSignedDocument(
-        sourcePath: filePath,
-        fileType: fileType,
-        pageCount: pageCount,
+        sourcePath: _sourcePath,
+        fileType: _fileType,
+        pageCount: _pageCount,
         placement: placement,
         signature: signature,
+        preferredBaseName: preferred.isEmpty ? null : preferred,
+        datePlacement: datePlacement,
       );
 
-      final title = filePath
-          .split(Platform.pathSeparator)
+      // Display name: user text if provided, else file stem / fallback.
+      final sanitized = sanitizeFileBaseName(preferred);
+      final fileStem = File(result.filePath)
+          .uri
+          .pathSegments
           .last
           .replaceAll(RegExp(r'\.[^.]+$'), '');
+      final title = sanitized.isNotEmpty
+          ? sanitized
+          : (fileStem.isEmpty ? 'Signed document' : fileStem);
+
       final document = DocumentModel(
         id: 'doc_${DateTime.now().millisecondsSinceEpoch}',
-        title: title.isEmpty ? 'Signed document' : title,
+        title: title,
         status: DocumentStatus.signed,
         updatedAt: DateTime.now(),
-        pageCount: pageCount,
+        pageCount: _pageCount,
         signerName: signature.name,
-        fileType:
-            fileType == 'pdf' ? DocumentFileType.pdf : DocumentFileType.image,
+        fileType: _fileType == 'pdf'
+            ? DocumentFileType.pdf
+            : DocumentFileType.image,
         filePath: result.filePath,
       );
       await StorageService.saveDocument(document);
@@ -102,6 +155,7 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
       if (!mounted) return;
       setState(() {
         _document = document;
+        _previewPng = result.previewPng;
         _status = _Status.done;
       });
     } catch (e) {
@@ -113,14 +167,122 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
     }
   }
 
-  Future<void> _share() async {
+  String get _shareLabel {
+    final title = _document?.title ?? 'Signed document';
+    return 'Signed document: $title';
+  }
+
+  String _shareFileName() {
+    final doc = _document;
+    if (doc == null) return 'signed.bin';
+    final ext = doc.isPdf ? '.pdf' : '.png';
+    final base = sanitizeFileBaseName(doc.title);
+    return '${base.isEmpty ? 'Signed document' : base}$ext';
+  }
+
+  Future<void> _shareFile() async {
     final path = _document?.filePath;
     if (path == null) return;
+    final label = _shareLabel;
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(path)],
-        subject: _document?.title,
+        files: [
+          XFile(
+            path,
+            name: _shareFileName(),
+            mimeType: _document!.isPdf ? 'application/pdf' : 'image/png',
+          ),
+        ],
+        subject: label,
+        text: label,
       ),
+    );
+  }
+
+  Future<void> _shareAsImage() async {
+    final doc = _document;
+    if (doc == null) return;
+    final label = _shareLabel;
+    Uint8List? bytes = _previewPng;
+    if (bytes == null && doc.hasFile && !doc.isPdf) {
+      bytes = await File(doc.filePath!).readAsBytes();
+    }
+    if (bytes == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image preview is not available')),
+      );
+      return;
+    }
+    final dir = await Directory.systemTemp.createTemp('sigsync_share');
+    final base = sanitizeFileBaseName(doc.title);
+    final out = File(
+      '${dir.path}/${base.isEmpty ? 'Signed document' : base}.png',
+    );
+    await out.writeAsBytes(bytes, flush: true);
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(out.path, name: '${base.isEmpty ? 'Signed document' : base}.png', mimeType: 'image/png')],
+        subject: label,
+        text: label,
+      ),
+    );
+  }
+
+  Future<void> _showShareSheet() async {
+    if (_document == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Share',
+                  style: AppTextStyles.bodyLarge.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.attach_file_rounded,
+                      color: AppColors.accentPurple),
+                  title: const Text('Share file'),
+                  subtitle: Text(
+                    _document!.isPdf ? 'PDF document' : 'Signed image',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _shareFile();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.image_outlined,
+                      color: AppColors.accentBlue),
+                  title: const Text('Share as image'),
+                  subtitle: Text(
+                    'Quick preview-quality PNG',
+                    style: AppTextStyles.bodySmall,
+                  ),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _shareAsImage();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -132,8 +294,19 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
         content: Text('Choose "Save to Files" (or "Save to Photos") next'),
       ),
     );
+    final label = _shareLabel;
     await SharePlus.instance.share(
-      ShareParams(files: [XFile(path)], subject: _document?.title),
+      ShareParams(
+        files: [
+          XFile(
+            path,
+            name: _shareFileName(),
+            mimeType: _document!.isPdf ? 'application/pdf' : 'image/png',
+          ),
+        ],
+        subject: label,
+        text: label,
+      ),
     );
   }
 
@@ -145,16 +318,106 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
           child: switch (_status) {
+            _Status.naming => _NamingView(
+                controller: _nameController,
+                extension: _fileType == 'pdf' ? '.pdf' : '.png',
+                onContinue: _confirmNameAndSign,
+              ),
             _Status.working => const _WorkingView(),
             _Status.error => _ErrorView(message: _error!),
             _Status.done => _DoneView(
                 document: _document!,
-                onShare: _share,
+                onShare: _showShareSheet,
                 onSaveToDevice: _saveToDevice,
               ),
           },
         ),
       ),
+    );
+  }
+}
+
+class _NamingView extends StatelessWidget {
+  const _NamingView({
+    required this.controller,
+    required this.extension,
+    required this.onContinue,
+  });
+
+  final TextEditingController controller;
+  final String extension;
+  final VoidCallback onContinue;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Spacer(),
+        Text(
+          'Name your signed file',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.headlineMedium,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Leave blank to use an automatic name. Extension $extension '
+          'is added for you.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.secondary.copyWith(fontSize: 13),
+        ),
+        const SizedBox(height: 24),
+        TextField(
+          controller: controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => onContinue(),
+          style: AppTextStyles.bodyLarge,
+          decoration: InputDecoration(
+            labelText: 'File name',
+            hintText: 'My contract - Signed',
+            suffixText: extension,
+            filled: true,
+            fillColor: AppColors.cardBackground,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.borderSubtle),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(color: AppColors.borderSubtle),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(14),
+              borderSide:
+                  const BorderSide(color: AppColors.accentPurple, width: 1.5),
+            ),
+          ),
+        ),
+        const Spacer(),
+        SizedBox(
+          height: 52,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: AppColors.violetGradient,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onContinue,
+                borderRadius: BorderRadius.circular(14),
+                child: Center(
+                  child: Text(
+                    'Continue & sign',
+                    style: AppTextStyles.onAccentLabel.copyWith(fontSize: 14),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -249,6 +512,12 @@ class _DoneView extends StatelessWidget {
           style: AppTextStyles.headlineMedium,
         ),
         const SizedBox(height: 10),
+        Text(
+          document.title,
+          textAlign: TextAlign.center,
+          style: AppTextStyles.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
         Text(
           'Your file is ready to share or save locally.',
           textAlign: TextAlign.center,
