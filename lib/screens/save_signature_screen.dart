@@ -9,6 +9,7 @@ import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/signature_visual.dart';
+import '../widgets/transparency_checkerboard.dart';
 
 class SaveSignatureScreen extends StatefulWidget {
   const SaveSignatureScreen({
@@ -47,9 +48,12 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
   @override
   void initState() {
     super.initState();
-    // Label field starts empty (or with a pre-filled label if one was passed).
-    // Auto/template "name" is signature text for the preview, not the label.
-    _nameController = TextEditingController();
+    // Show a visible default label the user can edit — never invent a
+    // numbered name invisibly at save time (that produced "Signature 5/6/7"
+    // with no sense they'd been asked to name it).
+    // Auto/generator `name` extras are signature *text* for the preview,
+    // not this label — leave those alone.
+    _nameController = TextEditingController(text: _defaultLabel());
   }
 
   @override
@@ -158,8 +162,11 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
       return;
     }
 
-    final typedName = _nameController.text.trim();
-    final name = typedName.isEmpty ? _defaultLabel() : typedName;
+    final name = _nameController.text.trim();
+    if (name.isEmpty) {
+      _showError('Enter a name for this signature');
+      return;
+    }
 
     final imagePathRaw = data['imagePath'] ?? '';
     final imagePath = imagePathRaw.isEmpty ? null : imagePathRaw;
@@ -402,7 +409,23 @@ class _SaveSignatureScreenState extends State<SaveSignatureScreen> {
       );
     }
 
-    // White "paper" so the preview matches how it will look on a document.
+    // Checkerboard so removed paper (alpha) stays visible — a solid white
+    // card made transparent PNGs look like the paper came back.
+    if (hasImageFile) {
+      return SizedBox(
+        height: 160,
+        child: TransparencyCheckerboard(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl,
+              vertical: AppSpacing.lg,
+            ),
+            child: child,
+          ),
+        ),
+      );
+    }
+
     return Container(
       height: 160,
       padding: const EdgeInsets.symmetric(

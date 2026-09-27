@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../models/document_model.dart';
+import '../services/document_signer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/navy_app_header.dart';
@@ -40,7 +41,21 @@ class _SignUploadScreenState extends State<SignUploadScreen> {
     final id = 'doc_${DateTime.now().millisecondsSinceEpoch}';
     final dest = File('${dir.path}/$id.$ext');
     await File(sourcePath).copy(dest.path);
+    // Camera / gallery JPEGs often only look upright because of EXIF tags;
+    // bake them so Place + signing see the same pixel dimensions.
+    await normalizeImageFileOrientation(dest.path);
     return dest.path;
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    debugPrint('[SignUpload] ERROR: $message');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _goToPreview({
@@ -69,10 +84,7 @@ class _SignUploadScreenState extends State<SignUploadScreen> {
       final file = result.files.single;
       final path = file.path;
       if (path == null || path.isEmpty) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not read the selected file')),
-        );
+        _showError('Could not read the selected file');
         return;
       }
 
@@ -80,10 +92,7 @@ class _SignUploadScreenState extends State<SignUploadScreen> {
       final type = _fileTypeFromPath(persisted);
       await _goToPreview(filePath: persisted, fileType: type);
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open file: $e')),
-      );
+      _showError('Could not open file: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -98,14 +107,19 @@ class _SignUploadScreenState extends State<SignUploadScreen> {
         imageQuality: 90,
       );
       if (photo == null) return;
+      if (photo.path.isEmpty) {
+        _showError('Camera did not return a usable photo — try again');
+        return;
+      }
+      if (!File(photo.path).existsSync()) {
+        _showError('Captured photo file is missing — try again');
+        return;
+      }
 
       final persisted = await _persistFile(photo.path, photo.name);
       await _goToPreview(filePath: persisted, fileType: 'image');
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not capture document: $e')),
-      );
+      _showError('Could not capture document: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

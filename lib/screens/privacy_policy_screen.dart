@@ -48,10 +48,10 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.sm),
                       Text(
-                        'Signature: Sync is designed to keep your signatures '
-                        'and documents on your device. Nothing you create is '
-                        'uploaded anywhere unless you choose to share or '
-                        'save a file yourself.',
+                        'Signature Maker & eSign PDF is designed to keep '
+                        'your signatures and documents on your device. '
+                        'Nothing you create is uploaded anywhere unless you '
+                        'choose to share or save a file yourself.',
                         style: AppTextStyles.secondary.copyWith(height: 1.55),
                       ),
                       const SizedBox(height: AppSpacing.lg),

@@ -44,6 +44,12 @@ const kSignatureFonts = <SignatureFont>[
   SignatureFont('Qwigley', SignatureFontCategory.signature, scale: 1.4),
   SignatureFont('Whisper', SignatureFontCategory.signature, scale: 1.2),
   SignatureFont('Birthstone', SignatureFontCategory.signature, scale: 1.1),
+  // Distinct additions — copperplate / modern / condensed, not Delafield clones.
+  SignatureFont('Imperial Script', SignatureFontCategory.signature, scale: 1.15),
+  SignatureFont('Dynalight', SignatureFontCategory.signature, scale: 1.2),
+  SignatureFont('Meow Script', SignatureFontCategory.signature, scale: 1.15),
+  SignatureFont('Carattere', SignatureFontCategory.signature, scale: 1.2),
+  SignatureFont('WindSong', SignatureFontCategory.signature, scale: 1.1),
   // Formal calligraphy.
   SignatureFont('Great Vibes', SignatureFontCategory.elegant),
   SignatureFont('Alex Brush', SignatureFontCategory.elegant),
@@ -53,6 +59,13 @@ const kSignatureFonts = <SignatureFont>[
   SignatureFont('Italianno', SignatureFontCategory.elegant, scale: 1.25),
   SignatureFont('Arizonia', SignatureFontCategory.elegant),
   SignatureFont('Rouge Script', SignatureFontCategory.elegant, scale: 1.1),
+  // Distinct additions — formal invitation / roundhand / soft brush.
+  SignatureFont('Luxurious Script', SignatureFontCategory.elegant, scale: 1.1),
+  SignatureFont('Petit Formal Script', SignatureFontCategory.elegant,
+      scale: 0.95),
+  SignatureFont('Niconne', SignatureFontCategory.elegant, scale: 1.1),
+  SignatureFont('Tangerine', SignatureFontCategory.elegant, scale: 1.2),
+  SignatureFont('Ephesis', SignatureFontCategory.elegant, scale: 1.15),
   // Natural pen handwriting.
   SignatureFont('Homemade Apple', SignatureFontCategory.handwritten,
       scale: 0.75),
@@ -63,10 +76,21 @@ const kSignatureFonts = <SignatureFont>[
   SignatureFont('Kristi', SignatureFontCategory.handwritten, scale: 1.1),
   SignatureFont('Sacramento', SignatureFontCategory.handwritten, scale: 1.15),
   SignatureFont('Dancing Script', SignatureFontCategory.handwritten),
+  // Distinct additions — marker / scratchy / casual loop (vs soft cursives).
+  SignatureFont('Caveat', SignatureFontCategory.handwritten, scale: 1.05),
+  SignatureFont('Rock Salt', SignatureFontCategory.handwritten, scale: 0.85),
+  SignatureFont('Bad Script', SignatureFontCategory.handwritten, scale: 1.05),
+  SignatureFont('Cookie', SignatureFontCategory.handwritten, scale: 1.1),
   // Heavier strokes.
   SignatureFont('Satisfy', SignatureFontCategory.bold, scale: 0.95),
   SignatureFont('Yellowtail', SignatureFontCategory.bold, scale: 0.95),
   SignatureFont('Pacifico', SignatureFontCategory.bold, scale: 0.8),
+  // Distinct additions — thick display scripts, not Pacifico/Yellowtail twins.
+  SignatureFont('Lobster', SignatureFontCategory.bold, scale: 0.9),
+  SignatureFont('Berkshire Swash', SignatureFontCategory.bold, scale: 0.95),
+  SignatureFont('Courgette', SignatureFontCategory.bold, scale: 0.95),
+  SignatureFont('Oleo Script', SignatureFontCategory.bold, scale: 0.95),
+  SignatureFont('Yesteryear', SignatureFontCategory.bold, scale: 1.05),
 ];
 
 /// Looks up a font by the label stored on a signature (case-insensitive).

@@ -88,9 +88,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadii.md),
         ),
-        title: Text('Delete document?', style: AppTextStyles.titleMedium),
+        title: Text('Delete this document?', style: AppTextStyles.titleMedium),
         content: Text(
-          'Remove “${doc.title}” from this device. This can’t be undone.',
+          "This can't be undone.",
           style: AppTextStyles.secondary.copyWith(fontSize: 13),
         ),
         actions: [

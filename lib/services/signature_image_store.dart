@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
 /// Stores signature PNGs where the platform allows it.
@@ -11,6 +12,9 @@ import 'package:path_provider/path_provider.dart';
 /// reference is its path. Web has no file system (path_provider throws
 /// MissingPluginException), so the PNG is kept inline as a `data:` URI that
 /// Hive persists alongside the signature record.
+///
+/// Always persists **PNG** (never JPEG) so alpha from background removal
+/// survives — JPEG has no alpha channel and would flatten transparency.
 class SignatureImageStore {
   SignatureImageStore._();
 
@@ -18,15 +22,40 @@ class SignatureImageStore {
 
   static bool _isDataUri(String ref) => ref.startsWith('data:');
 
-  /// Saves [bytes] and returns the reference to store in `imagePath`.
+  static bool _looksLikePng(Uint8List bytes) =>
+      bytes.length >= 8 &&
+      bytes[0] == 0x89 &&
+      bytes[1] == 0x50 &&
+      bytes[2] == 0x4E &&
+      bytes[3] == 0x47 &&
+      bytes[4] == 0x0D &&
+      bytes[5] == 0x0A &&
+      bytes[6] == 0x1A &&
+      bytes[7] == 0x0A;
+
+  /// Ensures [bytes] are a PNG with an alpha channel. If the payload is
+  /// already PNG, it is returned as-is; otherwise it is re-encoded as PNG.
+  static Uint8List ensurePng(Uint8List bytes) {
+    if (_looksLikePng(bytes)) return bytes;
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) {
+      throw StateError('Could not decode signature image bytes');
+    }
+    return Uint8List.fromList(
+      img.encodePng(decoded.convert(numChannels: 4)),
+    );
+  }
+
+  /// Saves [bytes] as a PNG and returns the reference to store in `imagePath`.
   static Future<String> save(String id, Uint8List bytes) async {
-    if (kIsWeb) return '$_dataUriPrefix${base64Encode(bytes)}';
+    final pngBytes = ensurePng(bytes);
+    if (kIsWeb) return '$_dataUriPrefix${base64Encode(pngBytes)}';
 
     final docs = await getApplicationDocumentsDirectory();
     final dir = Directory('${docs.path}/signatures');
     if (!await dir.exists()) await dir.create(recursive: true);
     final file = File('${dir.path}/$id.png');
-    await file.writeAsBytes(bytes, flush: true);
+    await file.writeAsBytes(pngBytes, flush: true);
     return file.path;
   }
 

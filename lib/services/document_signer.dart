@@ -502,6 +502,58 @@ Future<Uint8List> renderDateStampPng({
   return data!.buffer.asUint8List();
 }
 
+/// Decodes an image and applies EXIF orientation so pixel width/height match
+/// what Flutter typically displays for camera / gallery photos.
+img.Image decodeImageBakingOrientation(Uint8List bytes) {
+  final decoded = img.decodeImage(bytes);
+  if (decoded == null) {
+    throw StateError('Could not decode image bytes');
+  }
+  return img.bakeOrientation(decoded);
+}
+
+/// Rewrites [path] in place with EXIF orientation baked into the pixels
+/// (and soft-caps huge camera photos so signing doesn't OOM). No-op for
+/// non-image paths or undecodable files.
+Future<void> normalizeImageFileOrientation(String path) async {
+  final lower = path.toLowerCase();
+  final isImage = lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.png') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.heic') ||
+      lower.endsWith('.heif');
+  if (!isImage) return;
+
+  final file = File(path);
+  if (!await file.exists()) return;
+
+  final bytes = await file.readAsBytes();
+  img.Image oriented;
+  try {
+    oriented = decodeImageBakingOrientation(bytes);
+  } catch (_) {
+    return;
+  }
+
+  // Soft cap: phone cameras often shoot 12MP+; keep signing memory-safe.
+  const maxSide = 4096;
+  if (oriented.width > maxSide || oriented.height > maxSide) {
+    final scale = maxSide / math.max(oriented.width, oriented.height);
+    oriented = img.copyResize(
+      oriented,
+      width: (oriented.width * scale).round().clamp(1, maxSide),
+      height: (oriented.height * scale).round().clamp(1, maxSide),
+      interpolation: img.Interpolation.cubic,
+    );
+  }
+
+  final outBytes = lower.endsWith('.png')
+      ? Uint8List.fromList(img.encodePng(oriented))
+      : Uint8List.fromList(img.encodeJpg(oriented, quality: 92));
+  await file.writeAsBytes(outBytes, flush: true);
+}
+
 /// Composites [stampBytes] (a transparent signature PNG) onto [baseBytes]
 /// at [placement]'s fractional geometry, resized and rotated to match.
 /// When [datePlacement] is non-null, also draws the date stamp. Omitting
@@ -512,8 +564,15 @@ Future<Uint8List> compositeStampOnImage({
   required StampPlacement placement,
   DateStampPlacement? datePlacement,
 }) async {
-  final base = img.decodeImage(baseBytes)!.convert(numChannels: 4);
-  var stamp = img.decodeImage(stampBytes)!.convert(numChannels: 4);
+  // Bake EXIF so camera photos use the same width/height the Place screen
+  // showed (Flutter often auto-orients; package:image does not by default).
+  final base =
+      decodeImageBakingOrientation(baseBytes).convert(numChannels: 4);
+  final stampDecoded = img.decodeImage(stampBytes);
+  if (stampDecoded == null) {
+    throw StateError('Could not decode signature stamp image');
+  }
+  var stamp = stampDecoded.convert(numChannels: 4);
 
   final stampW = (placement.widthFrac * base.width).round().clamp(1, base.width);
   final stampH =

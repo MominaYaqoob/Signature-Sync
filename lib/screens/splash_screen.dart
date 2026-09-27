@@ -124,36 +124,21 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                         ),
                         const SizedBox(height: 18),
-                        Text.rich(
-                          TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'Signature',
-                                style: AppTextStyles.titleLarge.copyWith(
-                                  fontSize: 27,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              TextSpan(
-                                text: ':',
-                                style: AppTextStyles.titleLarge.copyWith(
-                                  fontSize: 27,
-                                  color: Colors.white.withValues(alpha: 0.85),
-                                ),
-                              ),
-                              TextSpan(
-                                text: 'Sync',
-                                style: AppTextStyles.titleLarge.copyWith(
-                                  fontSize: 27,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 28),
+                          child: Text(
+                            'Signature Maker & eSign PDF',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.titleLarge.copyWith(
+                              fontSize: 22,
+                              color: Colors.white,
+                              height: 1.2,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          'SIGN IT. SYNC IT. DONE.',
+                          'SIGN IT. SEND IT. DONE.',
                           style: AppTextStyles.labelMedium.copyWith(
                             color: Colors.white.withValues(alpha: 0.85),
                             letterSpacing: 1,

@@ -5,6 +5,7 @@ import '../models/signature_model.dart';
 import '../services/signature_image_store.dart';
 import '../theme/signature_fonts.dart';
 import '../theme/theme.dart';
+import 'transparency_checkerboard.dart';
 
 /// Cursive text style for a typed signature's font template label
 /// ("Great Vibes", "Dancing Script", …). Unknown labels use the app default.
@@ -45,6 +46,7 @@ class SignatureVisual extends StatelessWidget {
     this.fontSize = 28,
     this.maxLines = 1,
     this.fit = BoxFit.contain,
+    this.showTransparencyGrid = false,
   });
 
   factory SignatureVisual.fromModel(
@@ -53,6 +55,7 @@ class SignatureVisual extends StatelessWidget {
     double fontSize = 28,
     int maxLines = 1,
     BoxFit fit = BoxFit.contain,
+    bool showTransparencyGrid = false,
   }) {
     return SignatureVisual(
       name: signature.displayText,
@@ -62,6 +65,7 @@ class SignatureVisual extends StatelessWidget {
       fontSize: fontSize,
       maxLines: maxLines,
       fit: fit,
+      showTransparencyGrid: showTransparencyGrid,
     );
   }
 
@@ -73,14 +77,30 @@ class SignatureVisual extends StatelessWidget {
   final int maxLines;
   final BoxFit fit;
 
+  /// When true, image signatures sit on a checkerboard so removed paper
+  /// (alpha) is visible — opaque white cards make transparency look like
+  /// paper came back.
+  final bool showTransparencyGrid;
+
   @override
   Widget build(BuildContext context) {
     final path = imagePath;
     if (path != null && SignatureImageStore.exists(path)) {
-      return SignatureImageStore.image(
+      final image = SignatureImageStore.image(
         path,
         fit: fit,
         errorBuilder: (_, _, _) => _textFallback(),
+      );
+      if (!showTransparencyGrid) return image;
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(AppRadii.sm),
+        child: TransparencyCheckerboard(
+          cellSize: 8,
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: image,
+          ),
+        ),
       );
     }
     return _textFallback();

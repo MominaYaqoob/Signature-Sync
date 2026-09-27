@@ -83,7 +83,8 @@ class _AboutScreenState extends State<AboutScreen> {
                     ),
                     const SizedBox(height: AppSpacing.lg),
                     Text(
-                      'Signature: Sync',
+                      'Signature Maker & eSign PDF',
+                      textAlign: TextAlign.center,
                       style: AppTextStyles.headlineMedium,
                     ),
                     const SizedBox(height: 4),

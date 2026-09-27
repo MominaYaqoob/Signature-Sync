@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/signature_model.dart';
+import '../services/signature_image_store.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import '../widgets/accent_title.dart';
@@ -90,7 +91,7 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
                 const SizedBox(height: 10),
                 _CreateOption(
                   icon: Icons.auto_awesome_rounded,
-                  label: 'Auto',
+                  label: 'Auto Signature',
                   subtitle: 'Generate from your name',
                   color: AppColors.accentPurple,
                   onTap: () {
@@ -386,26 +387,37 @@ class _SignatureCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Signature preview on white so ink colours look as they will on paper.
-            Container(
-              height: 92,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-                border: Border.all(color: AppColors.divider),
-              ),
-              child: Center(
+            // Checkerboard for image signatures (alpha); white card for typed.
+            if (SignatureImageStore.exists(signature.imagePath))
+              SizedBox(
+                height: 92,
                 child: SignatureVisual.fromModel(
                   signature,
                   color: color,
                   fontSize: 38,
+                  showTransparencyGrid: true,
+                ),
+              )
+            else
+              Container(
+                height: 92,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppRadii.sm),
+                  border: Border.all(color: AppColors.divider),
+                ),
+                child: Center(
+                  child: SignatureVisual.fromModel(
+                    signature,
+                    color: color,
+                    fontSize: 38,
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [

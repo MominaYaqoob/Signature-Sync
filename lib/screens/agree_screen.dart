@@ -61,9 +61,9 @@ class _AgreeScreenState extends State<AgreeScreen> {
               ),
               const SizedBox(height: AppSpacing.xs),
               Text(
-                'Signature: Sync keeps your signatures and documents on '
-                'this device — no account, no cloud sync. Please review how '
-                'your data is handled before continuing.',
+                'Signature Maker & eSign PDF keeps your signatures and '
+                'documents on this device — no account, no cloud sync. '
+                'Please review how your data is handled before continuing.',
                 style: AppTextStyles.secondary.copyWith(height: 1.5),
               ),
               const SizedBox(height: AppSpacing.sm),

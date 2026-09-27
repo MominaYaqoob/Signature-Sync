@@ -112,14 +112,18 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
   void _setSwash(AutographSwash swash) {
     if (_designs.isEmpty || _designs[_selected].swash == swash) return;
     setState(() {
-      _designs = [..._designs];
+      // Apply to every card so STYLE changes compare consistently across the list.
       // Reset position when clearing the flourish; keep it when switching styles.
-      _designs[_selected] = _designs[_selected].copyWith(
-        swash: swash,
-        swashPosition: swash == AutographSwash.none
-            ? AutographSwashPosition.below
-            : null,
-      );
+      _designs = _designs
+          .map(
+            (d) => d.copyWith(
+              swash: swash,
+              swashPosition: swash == AutographSwash.none
+                  ? AutographSwashPosition.below
+                  : null,
+            ),
+          )
+          .toList();
     });
   }
 
@@ -129,9 +133,8 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
       return;
     }
     setState(() {
-      _designs = [..._designs];
-      _designs[_selected] =
-          _designs[_selected].copyWith(swashPosition: position);
+      _designs =
+          _designs.map((d) => d.copyWith(swashPosition: position)).toList();
     });
   }
 
@@ -140,8 +143,8 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
       return;
     }
     setState(() {
-      _designs = [..._designs];
-      _designs[_selected] = _designs[_selected].copyWith(strokeTaper: taper);
+      _designs =
+          _designs.map((d) => d.copyWith(strokeTaper: taper)).toList();
     });
   }
 

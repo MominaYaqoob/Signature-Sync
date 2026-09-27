@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Signature Sync</string>
+	<string>Signature Maker &amp; eSign PDF</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -67,8 +67,8 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Signature Sync needs camera access to scan your handwritten signature.</string>
+	<string>Signature Maker &amp; eSign PDF needs camera access to scan your handwritten signature.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Signature Sync needs photo library access to import signature images.</string>
+	<string>Signature Maker &amp; eSign PDF needs photo library access to import signature images.</string>
 </dict>
 </plist>

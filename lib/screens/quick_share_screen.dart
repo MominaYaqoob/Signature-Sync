@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../models/document_model.dart';
 import '../models/signature_model.dart';
+import '../services/ads_service.dart';
 import '../services/document_signer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
@@ -21,8 +22,54 @@ String _shortDate(DateTime d) {
   return '${months[d.month - 1]} ${d.day}';
 }
 
-class QuickShareScreen extends StatelessWidget {
-  const QuickShareScreen({super.key});
+class QuickShareScreen extends StatefulWidget {
+  const QuickShareScreen({super.key, this.initialDocument});
+
+  /// When set (e.g. from a home/documents card share icon), skip the
+  /// document-picker list and go straight to applying the default signature.
+  final DocumentModel? initialDocument;
+
+  @override
+  State<QuickShareScreen> createState() => _QuickShareScreenState();
+}
+
+class _QuickShareScreenState extends State<QuickShareScreen> {
+  /// True once we've attempted the preselected handoff (success or fallback).
+  var _preselectedHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialDocument != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _preselectedHandled) return;
+        _launchPreselected(widget.initialDocument!);
+      });
+    }
+  }
+
+  void _launchPreselected(DocumentModel doc) {
+    final signatures = StorageService.getAllSignatures();
+    final defaultSig = StorageService.getDefaultSignature() ??
+        (signatures.isNotEmpty ? signatures.first : null);
+    if (defaultSig == null) {
+      // Fall back to the picker UI so the user isn't stuck on a spinner.
+      setState(() => _preselectedHandled = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Create a signature first')),
+      );
+      return;
+    }
+    _preselectedHandled = true;
+    // Replace so Back from success returns to Home/Documents, not the picker.
+    context.pushReplacement(
+      '/quick-share/success',
+      extra: <String, Object>{
+        'document': doc,
+        'signature': defaultSig,
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,6 +86,45 @@ class QuickShareScreen extends StatelessWidget {
         (signatures.isNotEmpty ? signatures.first : null);
     final documents = StorageService.getAllDocuments();
 
+    // Brief placeholder while we hand off a pre-selected document — avoids
+    // flashing the full picker for one frame.
+    if (widget.initialDocument != null && !_preselectedHandled) {
+      return Scaffold(
+        backgroundColor: AppColors.primaryBackground,
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xs,
+                  AppSpacing.xs,
+                  AppSpacing.xl,
+                  AppSpacing.xs,
+                ),
+                child: NavyAppHeader(
+                  title: 'Quick Share',
+                  onBack: () => AdsService.instance.showInterstitial(
+                    onComplete: () {
+                      if (context.mounted) context.pop();
+                    },
+                  ),
+                  fontSize: 22,
+                ),
+              ),
+              const Expanded(
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.accentPurple,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
       body: SafeArea(
@@ -54,7 +140,11 @@ class QuickShareScreen extends StatelessWidget {
               ),
               child: NavyAppHeader(
                 title: 'Quick Share',
-                onBack: () => context.pop(),
+                onBack: () => AdsService.instance.showInterstitial(
+                  onComplete: () {
+                    if (context.mounted) context.pop();
+                  },
+                ),
                 fontSize: 22,
               ),
             ),
@@ -98,6 +188,7 @@ class QuickShareScreen extends StatelessWidget {
                               defaultSig,
                               color: AppColors.accentBlue,
                               fontSize: 40,
+                              showTransparencyGrid: true,
                             ),
                           ),
                         const SizedBox(height: AppSpacing.xs),
@@ -272,6 +363,16 @@ class _QuickShareSuccessScreenState extends State<QuickShareSuccessScreen> {
   String? _error;
   bool _ready = false;
 
+  /// End of the Quick Share flow — same pattern as Scan Signature back /
+  /// Save Signature. One interstitial, then navigate.
+  void _finish(String route) {
+    AdsService.instance.showInterstitial(
+      onComplete: () {
+        if (context.mounted) context.go(route);
+      },
+    );
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -342,7 +443,7 @@ class _QuickShareSuccessScreenState extends State<QuickShareSuccessScreen> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: IconButton(
-                  onPressed: () => context.go('/home'),
+                  onPressed: () => _finish('/home'),
                   icon: const Icon(
                     Icons.close_rounded,
                     color: AppColors.textPrimary,
@@ -417,7 +518,7 @@ class _QuickShareSuccessScreenState extends State<QuickShareSuccessScreen> {
               SizedBox(
                 height: 52,
                 child: PressableScale(
-                  onTap: () => context.go('/home'),
+                  onTap: () => _finish('/home'),
                   borderRadius: BorderRadius.circular(AppRadii.sm),
                   child: DecoratedBox(
                     decoration: AppDecorations.purpleButton(
@@ -439,7 +540,7 @@ class _QuickShareSuccessScreenState extends State<QuickShareSuccessScreen> {
                 height: 48,
                 child: PressableScale(
                   onTap: _status == _QuickShareStatus.done
-                      ? () => context.go('/documents')
+                      ? () => _finish('/documents')
                       : () {},
                   borderRadius: BorderRadius.circular(AppRadii.sm),
                   child: Center(

@@ -105,7 +105,16 @@ GoRouter createAppRouter() {
         path: '/quick-share',
         name: 'quickShare',
         parentNavigatorKey: _rootNavigatorKey,
-        builder: (context, state) => const QuickShareScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          DocumentModel? initial;
+          if (extra is DocumentModel) {
+            initial = extra;
+          } else if (extra is Map && extra['document'] is DocumentModel) {
+            initial = extra['document'] as DocumentModel;
+          }
+          return QuickShareScreen(initialDocument: initial);
+        },
         routes: [
           GoRoute(
             path: 'success',

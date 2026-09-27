@@ -132,7 +132,7 @@ class _SignatureSyncAppState extends State<SignatureSyncApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Signature: Sync',
+      title: 'Signature Maker & eSign PDF',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       themeMode: ThemeMode.light,

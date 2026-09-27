@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/signature_model.dart';
+import '../services/signature_image_store.dart';
 import '../services/signature_rasterizer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
@@ -177,23 +178,31 @@ class _SignatureDetailScreenState extends State<SignatureDetailScreen> {
               ),
               const SizedBox(height: AppSpacing.lg),
               Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: AppDecorations.card(
-                    radius: AppRadii.lg,
-                    prominent: true,
-                    color: Colors.white,
-                    borderColor: AppColors.divider,
-                  ),
-                  child: Center(
-                    child: SignatureVisual.fromModel(
-                      _signature,
-                      color: AppColors.accentBlue,
-                      fontSize: 56,
-                      maxLines: 2,
-                    ),
-                  ),
-                ),
+                child: SignatureImageStore.exists(_signature.imagePath)
+                    ? SignatureVisual.fromModel(
+                        _signature,
+                        color: AppColors.accentBlue,
+                        fontSize: 56,
+                        maxLines: 2,
+                        showTransparencyGrid: true,
+                      )
+                    : Container(
+                        padding: const EdgeInsets.all(28),
+                        decoration: AppDecorations.card(
+                          radius: AppRadii.lg,
+                          prominent: true,
+                          color: Colors.white,
+                          borderColor: AppColors.divider,
+                        ),
+                        child: Center(
+                          child: SignatureVisual.fromModel(
+                            _signature,
+                            color: AppColors.accentBlue,
+                            fontSize: 56,
+                            maxLines: 2,
+                          ),
+                        ),
+                      ),
               ),
               const SizedBox(height: AppSpacing.lg),
               Text(

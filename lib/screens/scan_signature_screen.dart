@@ -25,6 +25,17 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
 
   bool _busy = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Open the native camera as soon as this route is on screen — no extra
+    // tap on the placeholder capture button. Cancel keeps this UI as retry.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _busy) return;
+      _captureAndCrop(source: ImageSource.camera);
+    });
+  }
+
   void _showError(String message) {
     if (!mounted) return;
     debugPrint('[ScanSignature] ERROR: $message');

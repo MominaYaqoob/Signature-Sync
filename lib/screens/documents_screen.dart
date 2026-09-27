@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../models/document_model.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
+import '../widgets/document_actions.dart';
 import '../widgets/pressable_scale.dart';
 
 String _shortDate(DateTime d) {
@@ -51,55 +52,15 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         .toList();
   }
 
-  Future<void> _delete(DocumentModel doc) async {
-    await StorageService.deleteDocument(doc.id);
-    _reload();
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${doc.title} deleted')),
-    );
-  }
-
-  Future<void> _confirmDelete(DocumentModel doc) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppColors.cardBackground,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.md),
-          ),
-          title: Text(
-            'Delete document?',
-            style: AppTextStyles.titleMedium,
-          ),
-          content: Text(
-            'Remove “${doc.title}” from your signing history.',
-            style: AppTextStyles.secondary.copyWith(fontSize: 13),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text(
-                'Cancel',
-                style: AppTextStyles.secondary,
-              ),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text(
-                'Delete',
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: AppColors.danger,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        );
+  Future<void> _openMenu(DocumentModel doc) {
+    return showDocumentCardMenu(
+      context,
+      document: doc,
+      onShare: () {
+        context.push('/quick-share', extra: doc);
       },
+      onDeleted: _reload,
     );
-    if (confirmed == true && mounted) await _delete(doc);
   }
 
   @override
@@ -256,10 +217,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                               '/documents/detail/${doc.id}',
                               extra: doc,
                             ),
-                            onShare: () {
-                              context.push('/quick-share');
-                            },
-                            onDelete: () => _confirmDelete(doc),
+                            onMenu: () => _openMenu(doc),
                           );
                         },
                       ),
@@ -274,14 +232,12 @@ class _DocumentHistoryCard extends StatelessWidget {
   const _DocumentHistoryCard({
     required this.document,
     required this.onTap,
-    required this.onShare,
-    required this.onDelete,
+    required this.onMenu,
   });
 
   final DocumentModel document;
   final VoidCallback onTap;
-  final VoidCallback onShare;
-  final VoidCallback onDelete;
+  final VoidCallback onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -291,82 +247,66 @@ class _DocumentHistoryCard extends StatelessWidget {
         ? Icons.picture_as_pdf_rounded
         : Icons.image_outlined;
 
-    return Dismissible(
-      key: ValueKey(document.id),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (_) async {
-        onDelete();
-        return false;
-      },
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        decoration: BoxDecoration(
-          color: AppColors.danger.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(AppRadii.md),
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.md),
+      child: Container(
+        decoration: AppDecorations.card(
+          radius: AppRadii.md,
+          borderColor: tint.withValues(alpha: 0.22),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
-      ),
-      child: PressableScale(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadii.md),
-        child: Container(
-          decoration: AppDecorations.card(
-            radius: AppRadii.md,
-            borderColor: tint.withValues(alpha: 0.22),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.sm,
+            vertical: AppSpacing.md,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.sm,
-              vertical: AppSpacing.md,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: tint.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(AppRadii.sm),
-                  ),
-                  child: Icon(icon, color: tint, size: 20),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        document.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTextStyles.tileLabel,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Signed · ${_shortDate(document.updatedAt)}',
-                        style: AppTextStyles.labelMedium.copyWith(
-                          fontSize: 11,
-                          color: AppColors.accentBlue,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                PressableScale(
-                  onTap: onShare,
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(AppRadii.sm),
-                  child: const Padding(
-                    padding: EdgeInsets.all(8),
-                    child: Icon(
-                      Icons.ios_share_rounded,
-                      color: AppColors.textSecondary,
-                      size: 20,
+                ),
+                child: Icon(icon, color: tint, size: 20),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      document.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTextStyles.tileLabel,
                     ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Signed · ${_shortDate(document.updatedAt)}',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        fontSize: 11,
+                        color: AppColors.accentBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Same ⋮ → bottom sheet as My Signatures (Share + Delete).
+              PressableScale(
+                onTap: onMenu,
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.textSecondary,
+                    size: 20,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

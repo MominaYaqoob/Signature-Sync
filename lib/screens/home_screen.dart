@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../services/storage_service.dart';
+import '../services/signature_image_store.dart';
 import '../theme/theme.dart';
+import '../widgets/document_actions.dart';
 import '../widgets/native_ad_card.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/signature_visual.dart';
@@ -151,8 +153,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   return _DocumentCard(
                     title: doc.title,
                     subtitle: 'Signed · ${_shortDate(doc.updatedAt)}',
-                    onShare: () {
-                      context.push('/quick-share');
+                    onMenu: () {
+                      showDocumentCardMenu(
+                        context,
+                        document: doc,
+                        onShare: () {
+                          context.push('/quick-share', extra: doc);
+                        },
+                      );
                     },
                   );
                 },
@@ -332,7 +340,7 @@ class _QuickActionsGrid extends StatelessWidget {
       shadowColor: AppColors.accentBlue,
     ),
     _QuickAction(
-      label: 'Auto',
+      label: 'Type name',
       icon: Icons.auto_awesome_rounded,
       gradient: AppColors.violetGradient,
       shadowColor: AppColors.accentPurple,
@@ -455,10 +463,12 @@ class _QuickActionCard extends StatelessWidget {
 
     // Opening a feature never shows an ad — interstitials only fire when
     // the user is done (save/back), from inside each feature's own flow.
+    // Auto Signature ("Type name") is only reached from this tile / My
+    // Signatures — never from document share / Quick Share.
     const routes = {
       'Draw': '/draw-signature',
       'Scan': '/scan-signature',
-      'Auto': '/auto-signature',
+      'Type name': '/auto-signature',
       'Sign doc': '/sign-document',
       'Generate': '/signature-generator',
       'Share': '/quick-share',
@@ -515,6 +525,20 @@ class _SignaturePreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasImage =
+        imagePath != null && SignatureImageStore.exists(imagePath!);
+    final visual = SignatureVisual(
+      name: name,
+      imagePath: imagePath,
+      fontLabel: fontLabel,
+      color: color,
+      showTransparencyGrid: hasImage,
+    );
+    // Scanned signatures: checkerboard (opaque softBlue/softPurple looked
+    // like the paper background came back). Typed/auto keep tinted cards.
+    if (hasImage) {
+      return SizedBox(width: 140, height: 100, child: visual);
+    }
     return Container(
       width: 140,
       padding: const EdgeInsets.symmetric(
@@ -529,14 +553,7 @@ class _SignaturePreviewCard extends StatelessWidget {
         prominent: true,
         borderColor: color.withValues(alpha: 0.28),
       ),
-      child: Center(
-        child: SignatureVisual(
-          name: name,
-          imagePath: imagePath,
-          fontLabel: fontLabel,
-          color: color,
-        ),
-      ),
+      child: Center(child: visual),
     );
   }
 }
@@ -652,12 +669,12 @@ class _DocumentCard extends StatelessWidget {
   const _DocumentCard({
     required this.title,
     required this.subtitle,
-    required this.onShare,
+    required this.onMenu,
   });
 
   final String title;
   final String subtitle;
-  final VoidCallback onShare;
+  final VoidCallback onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -706,13 +723,14 @@ class _DocumentCard extends StatelessWidget {
               ],
             ),
           ),
+          // Same ⋮ control as My Signatures cards.
           PressableScale(
-            onTap: onShare,
+            onTap: onMenu,
             borderRadius: BorderRadius.circular(AppRadii.sm),
             child: const Padding(
               padding: EdgeInsets.all(8),
               child: Icon(
-                Icons.ios_share_rounded,
+                Icons.more_vert_rounded,
                 color: AppColors.textSecondary,
                 size: 20,
               ),

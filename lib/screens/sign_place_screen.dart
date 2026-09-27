@@ -118,6 +118,9 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
           await doc.close();
         }
       } else {
+        // Ensure EXIF is baked before measuring aspect / placing the stamp
+        // (covers docs imported before this fix, and any missed normalize).
+        await normalizeImageFileOrientation(_filePath);
         bytes = await File(_filePath).readAsBytes();
       }
 
@@ -231,25 +234,44 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
     });
   }
 
+  void _showError(String message) {
+    if (!mounted) return;
+    debugPrint('[SignPlace] ERROR: $message');
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   void _rotate() {
     setState(() => _rotation += math.pi / 12);
   }
 
-  void _apply() {
+  Future<void> _apply() async {
     if (!_canApply) return;
-    final signature = _signatures[_selectedSig];
-    final docSize = _docSize;
-    final position = _position;
+    try {
+      final signature = _signatures[_selectedSig];
+      final docSize = _docSize;
+      final position = _position;
+      if (docSize == null || position == null) {
+        _showError('Could not read signature placement — try again');
+        return;
+      }
+      if (_filePath.isEmpty || !File(_filePath).existsSync()) {
+        _showError('Document file is missing — go back and import again');
+        return;
+      }
 
-    final extra = <String, Object?>{
-      'filePath': _filePath,
-      'fileType': _fileType,
-      'pageIndex': _pageIndex,
-      'pageCount': _pageCount,
-      'signatureId': signature.id,
-      // Placement as fractions of the page, so a later merge step can map
-      // it onto the document at full resolution regardless of screen size.
-      if (docSize != null && position != null)
+      final extra = <String, Object?>{
+        'filePath': _filePath,
+        'fileType': _fileType,
+        'pageIndex': _pageIndex,
+        'pageCount': _pageCount,
+        'signatureId': signature.id,
+        // Placement as fractions of the page, so a later merge step can map
+        // it onto the document at full resolution regardless of screen size.
         'stamp': <String, double>{
           'xFrac': (position.dx / docSize.width).clamp(0, 1),
           'yFrac': (position.dy / docSize.height).clamp(0, 1),
@@ -257,25 +279,28 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
           'heightFrac': (_stampSize.height / docSize.height).clamp(0, 1),
           'rotationRadians': _rotation,
         },
-      if (_addDate && docSize != null && _datePosition != null)
-        'dateStamp': <String, Object?>{
-          'xFrac': (_datePosition!.dx / docSize.width).clamp(0, 1),
-          'yFrac': (_datePosition!.dy / docSize.height).clamp(0, 1),
-          'widthFrac': (_dateSize.width / docSize.width).clamp(0, 1),
-          'heightFrac': (_dateSize.height / docSize.height).clamp(0, 1),
-          'style': _dateStyle.name,
-          'text': _dateText,
-        },
-    };
+        if (_addDate && _datePosition != null)
+          'dateStamp': <String, Object?>{
+            'xFrac': (_datePosition!.dx / docSize.width).clamp(0, 1),
+            'yFrac': (_datePosition!.dy / docSize.height).clamp(0, 1),
+            'widthFrac': (_dateSize.width / docSize.width).clamp(0, 1),
+            'heightFrac': (_dateSize.height / docSize.height).clamp(0, 1),
+            'style': _dateStyle.name,
+            'text': _dateText,
+          },
+      };
 
-    // End of the sign-document flow — one of the app's ad plan placements.
-    AdsService.instance.showInterstitial(
-      onComplete: () {
-        if (context.mounted) {
-          context.push('/sign-document/success', extra: extra);
-        }
-      },
-    );
+      // End of the sign-document flow — one of the app's ad plan placements.
+      AdsService.instance.showInterstitial(
+        onComplete: () {
+          if (context.mounted) {
+            context.push('/sign-document/success', extra: extra);
+          }
+        },
+      );
+    } catch (e) {
+      _showError('Could not start signing: $e');
+    }
   }
 
   @override
