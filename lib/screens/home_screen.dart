@@ -122,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.xl,
-                  AppSpacing.xl,
+                  AppSpacing.md,
                   AppSpacing.xl,
                   0,
                 ),
@@ -132,7 +132,7 @@ class _HomeScreenState extends State<HomeScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(
-                  top: AppSpacing.xl + AppSpacing.xs,
+                  top: AppSpacing.md,
                   bottom: AppSpacing.sm,
                 ),
                 child: _SectionTitle(
@@ -153,6 +153,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   return _DocumentCard(
                     title: doc.title,
                     subtitle: 'Signed · ${_shortDate(doc.updatedAt)}',
+                    onShare: () {
+                      // One tap → Quick Share with this document pre-selected.
+                      context.push('/quick-share', extra: doc);
+                    },
                     onMenu: () {
                       showDocumentCardMenu(
                         context,
@@ -669,11 +673,13 @@ class _DocumentCard extends StatelessWidget {
   const _DocumentCard({
     required this.title,
     required this.subtitle,
+    required this.onShare,
     required this.onMenu,
   });
 
   final String title;
   final String subtitle;
+  final VoidCallback onShare;
   final VoidCallback onMenu;
 
   @override
@@ -723,7 +729,21 @@ class _DocumentCard extends StatelessWidget {
               ],
             ),
           ),
-          // Same ⋮ control as My Signatures cards.
+          // Primary: one-tap Quick Share (no menu).
+          PressableScale(
+            onTap: onShare,
+            borderRadius: BorderRadius.circular(AppRadii.sm),
+            child: const Padding(
+              padding: EdgeInsets.all(10),
+              child: Icon(
+                Icons.ios_share_rounded,
+                color: AppColors.textSecondary,
+                size: 22,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Secondary: ⋮ keeps Delete (and Share) reachable.
           PressableScale(
             onTap: onMenu,
             borderRadius: BorderRadius.circular(AppRadii.sm),

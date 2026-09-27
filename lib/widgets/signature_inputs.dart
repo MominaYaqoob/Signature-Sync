@@ -57,7 +57,7 @@ class SignatureNameField extends StatelessWidget {
   }
 }
 
-/// Ink colour chips for text-based signatures (wraps when many colours).
+/// Ink colour swatches in a single horizontal row (label under the row).
 class InkPicker extends StatelessWidget {
   const InkPicker({super.key, required this.selected, required this.onSelect});
 
@@ -66,6 +66,8 @@ class InkPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final name = kInkColors[selected.clamp(0, kInkColors.length - 1)].label;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -77,54 +79,62 @@ class InkPicker extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpacing.xs),
-        Wrap(
-          spacing: AppSpacing.xs,
-          runSpacing: AppSpacing.xs,
-          children: [
-            for (var i = 0; i < kInkColors.length; i++)
-              PressableScale(
-                onTap: () => onSelect(i),
-                borderRadius: BorderRadius.circular(999),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  padding: const EdgeInsets.fromLTRB(6, 5, 10, 5),
-                  decoration: BoxDecoration(
-                    color: i == selected
-                        ? kInkColors[i].color.withValues(alpha: 0.08)
-                        : AppColors.primaryBackground,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: i == selected
-                          ? kInkColors[i].color
-                          : AppColors.borderSoft,
-                      width: i == selected ? 1.6 : 1,
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (var i = 0; i < kInkColors.length; i++) ...[
+                if (i > 0) const SizedBox(width: 8),
+                PressableScale(
+                  onTap: () => onSelect(i),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Tooltip(
+                    message: kInkColors[i].label,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 160),
+                      width: 30,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: kInkColors[i].color,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: i == selected
+                              ? AppColors.accentPurple
+                              : Colors.white,
+                          width: i == selected ? 2.5 : 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: kInkColors[i]
+                                .color
+                                .withValues(alpha: 0.28),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          ),
+                        ],
+                      ),
+                      child: i == selected
+                          ? const Icon(
+                              Icons.check_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            )
+                          : null,
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: kInkColors[i].color,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        kInkColors[i].label,
-                        style: AppTextStyles.labelMedium.copyWith(
-                          color: AppColors.textPrimary,
-                          fontWeight:
-                              i == selected ? FontWeight.w700 : FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
-              ),
-          ],
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          name,
+          style: AppTextStyles.bodySmall.copyWith(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textSecondary,
+          ),
         ),
       ],
     );

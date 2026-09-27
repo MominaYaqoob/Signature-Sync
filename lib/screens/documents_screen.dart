@@ -217,6 +217,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                               '/documents/detail/${doc.id}',
                               extra: doc,
                             ),
+                            onShare: () {
+                              context.push('/quick-share', extra: doc);
+                            },
                             onMenu: () => _openMenu(doc),
                           );
                         },
@@ -232,11 +235,13 @@ class _DocumentHistoryCard extends StatelessWidget {
   const _DocumentHistoryCard({
     required this.document,
     required this.onTap,
+    required this.onShare,
     required this.onMenu,
   });
 
   final DocumentModel document;
   final VoidCallback onTap;
+  final VoidCallback onShare;
   final VoidCallback onMenu;
 
   @override
@@ -293,7 +298,19 @@ class _DocumentHistoryCard extends StatelessWidget {
                   ],
                 ),
               ),
-              // Same ⋮ → bottom sheet as My Signatures (Share + Delete).
+              PressableScale(
+                onTap: onShare,
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                child: const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: Icon(
+                    Icons.ios_share_rounded,
+                    color: AppColors.textSecondary,
+                    size: 22,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
               PressableScale(
                 onTap: onMenu,
                 borderRadius: BorderRadius.circular(AppRadii.sm),

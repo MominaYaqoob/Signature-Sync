@@ -52,6 +52,7 @@ class AutographSpec {
     this.strokeTaper = AutographStrokeTaper.none,
     this.connectedFlow = false,
     this.accentDot = false,
+    this.midLine = false,
     this.swashPosition = AutographSwashPosition.below,
   });
 
@@ -69,14 +70,17 @@ class AutographSpec {
   final AutographStrokeTaper strokeTaper;
   final bool connectedFlow;
   final bool accentDot;
+
+  /// Soft bank-check style line through the vertical middle of the name.
+  final bool midLine;
   final AutographSwashPosition swashPosition;
 
   /// Builds a random design. Multi-word names get every layout; a single
   /// word only makes sense as the full word (not seal/initials).
   ///
   /// At most one "extra" effect is enabled per design (connectedFlow,
-  /// accentDot, stroke taper, or side swash) so stacked flourishes don't
-  /// bury the name. ~45% of designs stay fully clean.
+  /// midLine, accentDot, stroke taper, or side swash) so stacked flourishes
+  /// don't bury the name. ~45% of designs stay fully clean.
   factory AutographSpec.random(math.Random random, {required bool multiWord}) {
     final fonts = kSignatureFonts
         .where((f) => f.category != SignatureFontCategory.bold)
@@ -103,16 +107,19 @@ class AutographSpec {
     var strokeTaper = AutographStrokeTaper.none;
     var connectedFlow = false;
     var accentDot = false;
+    var midLine = false;
 
     // Pick zero or one extra effect (weighted toward none).
     final roll = random.nextDouble();
     if (roll < 0.45) {
       // Clean — no extras.
-    } else if (roll < 0.60) {
+    } else if (roll < 0.58) {
       connectedFlow = true;
-    } else if (roll < 0.74) {
+    } else if (roll < 0.68) {
+      midLine = true;
+    } else if (roll < 0.80) {
       accentDot = true;
-    } else if (roll < 0.88) {
+    } else if (roll < 0.90) {
       const tapers = [
         AutographStrokeTaper.thickToThin,
         AutographStrokeTaper.thinToThick,
@@ -137,6 +144,7 @@ class AutographSpec {
       strokeTaper: strokeTaper,
       connectedFlow: connectedFlow,
       accentDot: accentDot,
+      midLine: midLine,
       swashPosition: swashPosition,
     );
   }
@@ -146,6 +154,7 @@ class AutographSpec {
     AutographStrokeTaper? strokeTaper,
     bool? connectedFlow,
     bool? accentDot,
+    bool? midLine,
     AutographSwashPosition? swashPosition,
   }) =>
       AutographSpec(
@@ -158,6 +167,7 @@ class AutographSpec {
         strokeTaper: strokeTaper ?? this.strokeTaper,
         connectedFlow: connectedFlow ?? this.connectedFlow,
         accentDot: accentDot ?? this.accentDot,
+        midLine: midLine ?? this.midLine,
         swashPosition: swashPosition ?? this.swashPosition,
       );
 }
@@ -416,6 +426,11 @@ class AutographPainter extends CustomPainter {
       top = math.min(top, -fs * 0.12);
     }
 
+    if (spec.midLine) {
+      left = math.min(left, -fs * 0.1);
+      right = math.max(right, w + fs * 0.1);
+    }
+
     return Rect.fromLTRB(left, top, right, bottom);
   }
 
@@ -614,6 +629,25 @@ class AutographPainter extends CustomPainter {
 
     if (spec.connectedFlow) {
       _drawConnectors(canvas, tp, ascent);
+    }
+
+    if (spec.midLine) {
+      // Soft bank-check line through the vertical middle of the glyphs.
+      final y = -ascent * 0.42;
+      final mid = Path()
+        ..moveTo(-_baseSize * 0.1, y)
+        ..quadraticBezierTo(
+          tp.width / 2,
+          y - _baseSize * 0.025,
+          tp.width + _baseSize * 0.1,
+          y,
+        );
+      _drawPathStroke(
+        canvas,
+        mid,
+        color: ink.withValues(alpha: 0.35),
+        baseWidth: _baseSize * 0.028,
+      );
     }
 
     Path? drawnSwash;

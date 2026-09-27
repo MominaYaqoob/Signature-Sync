@@ -148,6 +148,36 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
     });
   }
 
+  void _setConnectedFlow(bool value) {
+    if (_designs.isEmpty || _designs[_selected].connectedFlow == value) {
+      return;
+    }
+    setState(() {
+      _designs =
+          _designs.map((d) => d.copyWith(connectedFlow: value)).toList();
+    });
+  }
+
+  void _setMidLine(bool value) {
+    if (_designs.isEmpty || _designs[_selected].midLine == value) {
+      return;
+    }
+    setState(() {
+      _designs = _designs.map((d) => d.copyWith(midLine: value)).toList();
+    });
+  }
+
+  TextStyle get _styleRowLabel => AppTextStyles.labelMedium.copyWith(
+        color: AppColors.textSecondary,
+        fontWeight: FontWeight.w600,
+        fontSize: 12,
+      );
+
+  Widget _styleSectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Text(text, style: _styleRowLabel),
+      );
+
   Future<void> _useSignature() async {
     if (_exporting) return;
     if (_name.isEmpty) {
@@ -190,6 +220,8 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
   @override
   Widget build(BuildContext context) {
     final hasName = _name.isNotEmpty;
+    final hasDesigns = hasName && _designs.isNotEmpty;
+    final selectedSpec = hasDesigns ? _designs[_selected] : null;
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
@@ -210,121 +242,162 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
               ),
             ),
             Expanded(
-              child: ListView(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.xl,
-                  AppSpacing.md,
-                  AppSpacing.xl,
-                  AppSpacing.lg,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    'Type your name and we’ll design autograph-style '
-                    'signatures for you. Tap Regenerate for new ideas.',
-                    style: AppTextStyles.bodySmall,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SignatureNameField(controller: _nameController),
-                  const SizedBox(height: AppSpacing.md),
-                  Text(
-                    'STYLE',
-                    style: AppTextStyles.eyebrow.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.6,
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.xl,
+                      AppSpacing.md,
+                      AppSpacing.xl,
+                      0,
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Choose ink and flourishes, then pick a design below.',
-                    style: AppTextStyles.bodySmall,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  InkPicker(
-                    selected: _inkIndex,
-                    onSelect: (i) => setState(() => _inkIndex = i),
-                  ),
-                  if (hasName && _designs.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Stroke style',
-                      style: AppTextStyles.labelMedium.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    _StrokeTaperPicker(
-                      selected: _designs[_selected].strokeTaper,
-                      onSelect: _setStrokeTaper,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Swash style',
-                      style: AppTextStyles.labelMedium.copyWith(
-                        color: AppColors.textSecondary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    _SwashPicker(
-                      selected: _designs[_selected].swash,
-                      ink: _ink,
-                      onSelect: _setSwash,
-                    ),
-                    if (_designs[_selected].swash != AutographSwash.none) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      Text(
-                        'Swash position',
-                        style: AppTextStyles.labelMedium.copyWith(
-                          color: AppColors.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '“Through” is a soft under-stroke — preview before using.',
-                        style: AppTextStyles.bodySmall.copyWith(fontSize: 11),
-                      ),
-                      const SizedBox(height: AppSpacing.xs),
-                      _SwashPositionPicker(
-                        selected: _designs[_selected].swashPosition,
-                        onSelect: _setSwashPosition,
-                      ),
-                    ],
-                  ],
-                  const SizedBox(height: AppSpacing.lg),
-                  if (!hasName)
-                    const _EmptyHint()
-                  else ...[
-                    Row(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'YOUR DESIGNS',
-                          style: AppTextStyles.eyebrow.copyWith(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.6,
-                          ),
+                          'Type your name and we\u2019ll design autograph-style '
+                          'signatures for you. Tap Regenerate for new ideas.',
+                          style: AppTextStyles.bodySmall,
                         ),
-                        const Spacer(),
-                        _RegenerateChip(onTap: _regenerate),
+                        const SizedBox(height: AppSpacing.md),
+                        SignatureNameField(controller: _nameController),
+                        if (hasDesigns && selectedSpec != null) ...[
+                          const SizedBox(height: AppSpacing.md),
+                          Text(
+                            'PREVIEW',
+                            style: AppTextStyles.eyebrow.copyWith(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.6,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          _LivePreview(
+                            name: _name,
+                            spec: selectedSpec,
+                            ink: _ink,
+                            fontEpoch: _fontEpoch,
+                          ),
+                        ],
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.sm),
-                    for (var i = 0; i < _designs.length; i++) ...[
-                      if (i > 0) const SizedBox(height: AppSpacing.sm),
-                      _DesignCard(
-                        name: _name,
-                        spec: _designs[i],
-                        ink: _ink,
-                        fontEpoch: _fontEpoch,
-                        selected: i == _selected,
-                        onTap: () => setState(() => _selected = i),
+                  ),
+                  Expanded(
+                    child: ListView(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.xl,
+                        AppSpacing.md,
+                        AppSpacing.xl,
+                        AppSpacing.lg,
                       ),
-                    ],
-                  ],
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                          decoration: AppDecorations.card(
+                            radius: AppRadii.md,
+                            color: AppColors.softPurple.withValues(alpha: 0.35),
+                            borderColor: AppColors.accentPurple
+                                .withValues(alpha: 0.18),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'STYLE',
+                                style: AppTextStyles.eyebrow.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.6,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Ink, stroke, and line effects apply to every design below.',
+                                style: AppTextStyles.bodySmall,
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              InkPicker(
+                                selected: _inkIndex,
+                                onSelect: (i) =>
+                                    setState(() => _inkIndex = i),
+                              ),
+                              if (hasDesigns && selectedSpec != null) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                _styleSectionLabel('Stroke style'),
+                                _StrokeTaperPicker(
+                                  selected: selectedSpec.strokeTaper,
+                                  onSelect: _setStrokeTaper,
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                _styleSectionLabel('Swash style'),
+                                _SwashPicker(
+                                  selected: selectedSpec.swash,
+                                  ink: _ink,
+                                  onSelect: _setSwash,
+                                ),
+                                if (selectedSpec.swash !=
+                                    AutographSwash.none) ...[
+                                  const SizedBox(height: AppSpacing.sm),
+                                  _styleSectionLabel('Swash position'),
+                                  Text(
+                                    '\u201cThrough\u201d is a soft under-stroke — preview before using.',
+                                    style: AppTextStyles.bodySmall
+                                        .copyWith(fontSize: 11),
+                                  ),
+                                  const SizedBox(height: AppSpacing.xs),
+                                  _SwashPositionPicker(
+                                    selected: selectedSpec.swashPosition,
+                                    onSelect: _setSwashPosition,
+                                  ),
+                                ],
+                                const SizedBox(height: AppSpacing.md),
+                                _styleSectionLabel('Line effects'),
+                                _LineEffectToggles(
+                                  runLine: selectedSpec.connectedFlow,
+                                  midLine: selectedSpec.midLine,
+                                  onRunLine: _setConnectedFlow,
+                                  onMidLine: _setMidLine,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        if (!hasName)
+                          const _EmptyHint()
+                        else ...[
+                          Row(
+                            children: [
+                              Text(
+                                'YOUR DESIGNS',
+                                style: AppTextStyles.eyebrow.copyWith(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.6,
+                                ),
+                              ),
+                              const Spacer(),
+                              _RegenerateChip(onTap: _regenerate),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          for (var i = 0; i < _designs.length; i++) ...[
+                            if (i > 0) const SizedBox(height: AppSpacing.sm),
+                            _DesignCard(
+                              name: _name,
+                              spec: _designs[i],
+                              ink: _ink,
+                              fontEpoch: _fontEpoch,
+                              selected: i == _selected,
+                              onTap: () => setState(() => _selected = i),
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -393,6 +466,136 @@ class _SignatureGeneratorScreenState extends State<SignatureGeneratorScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+class _LivePreview extends StatelessWidget {
+  const _LivePreview({
+    required this.name,
+    required this.spec,
+    required this.ink,
+    required this.fontEpoch,
+  });
+
+  final String name;
+  final AutographSpec spec;
+  final Color ink;
+  final int fontEpoch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 152,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppRadii.md),
+        border: Border.all(color: AppColors.accentPurple.withValues(alpha: 0.28), width: 1.5),
+        boxShadow: AppShadows.elevated,
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 16, 22, 16),
+        child: CustomPaint(
+          painter: AutographPainter(
+            name: name,
+            spec: spec,
+            ink: ink,
+            fontEpoch: fontEpoch,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LineEffectToggles extends StatelessWidget {
+  const _LineEffectToggles({
+    required this.runLine,
+    required this.midLine,
+    required this.onRunLine,
+    required this.onMidLine,
+  });
+
+  final bool runLine;
+  final bool midLine;
+  final ValueChanged<bool> onRunLine;
+  final ValueChanged<bool> onMidLine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpacing.xs,
+      runSpacing: AppSpacing.xs,
+      children: [
+        _LineToggleChip(
+          label: 'Run line',
+          selected: runLine,
+          onTap: () => onRunLine(!runLine),
+        ),
+        _LineToggleChip(
+          label: 'Mid-line',
+          selected: midLine,
+          onTap: () => onMidLine(!midLine),
+        ),
+      ],
+    );
+  }
+}
+
+class _LineToggleChip extends StatelessWidget {
+  const _LineToggleChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return PressableScale(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadii.sm),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.accentPurple.withValues(alpha: 0.10)
+              : Colors.white,
+          borderRadius: BorderRadius.circular(AppRadii.sm),
+          border: Border.all(
+            color: selected ? AppColors.accentPurple : AppColors.divider,
+            width: selected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected
+                  ? Icons.check_box_rounded
+                  : Icons.check_box_outline_blank_rounded,
+              size: 18,
+              color: selected
+                  ? AppColors.accentPurpleDark
+                  : AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: AppTextStyles.labelMedium.copyWith(
+                fontSize: 12,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected
+                    ? AppColors.accentPurpleDark
+                    : AppColors.textSecondary,
               ),
             ),
           ],
