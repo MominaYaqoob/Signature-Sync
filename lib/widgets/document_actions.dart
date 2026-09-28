@@ -1,9 +1,56 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../models/document_model.dart';
+import '../services/ads_service.dart';
+import '../services/document_signer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 import 'signature_actions.dart' show kDeleteRed;
+
+/// Share the document's existing file as-is (no re-stamp, no duplicate save).
+/// Shows one interstitial only after the share sheet returns.
+Future<void> shareDocumentFile(
+  BuildContext context,
+  DocumentModel doc,
+) async {
+  final path = doc.filePath;
+  if (path == null || path.isEmpty || !File(path).existsSync()) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Document file is missing')),
+      );
+    }
+    return;
+  }
+
+  final title = doc.title;
+  final label = 'Signed document: $title';
+  final ext = doc.isPdf ? '.pdf' : signedImageExtension(doc.filePath);
+  final safe = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+  final name = '${safe.isEmpty ? 'Signed document' : safe}$ext';
+
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [
+        XFile(
+          path,
+          name: name,
+          mimeType: doc.isPdf
+              ? 'application/pdf'
+              : signedImageMimeType(doc.filePath),
+        ),
+      ],
+      subject: label,
+      text: label,
+    ),
+  );
+
+  if (!context.mounted) return;
+  AdsService.instance.showInterstitial(onComplete: () {});
+}
 
 /// Confirm, then remove the Hive record and the file on disk.
 Future<bool> confirmAndDeleteDocument(

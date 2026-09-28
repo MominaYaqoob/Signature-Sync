@@ -6,6 +6,7 @@ import 'package:pdfx/pdfx.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../models/document_model.dart';
+import '../services/document_signer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
 
@@ -60,7 +61,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     }
     final title = _doc?.title ?? 'Signed document';
     final label = 'Signed document: $title';
-    final ext = _doc!.isPdf ? '.pdf' : '.png';
+    final ext = _doc!.isPdf ? '.pdf' : signedImageExtension(_doc!.filePath);
     final safe = title.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
     final name = '${safe.isEmpty ? 'Signed document' : safe}$ext';
     await SharePlus.instance.share(
@@ -69,7 +70,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
           XFile(
             path,
             name: name,
-            mimeType: _doc!.isPdf ? 'application/pdf' : 'image/png',
+            mimeType: _doc!.isPdf
+                ? 'application/pdf'
+                : signedImageMimeType(_doc!.filePath),
           ),
         ],
         subject: label,

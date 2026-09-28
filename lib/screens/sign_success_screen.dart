@@ -175,7 +175,7 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
   String _shareFileName() {
     final doc = _document;
     if (doc == null) return 'signed.bin';
-    final ext = doc.isPdf ? '.pdf' : '.png';
+    final ext = doc.isPdf ? '.pdf' : signedImageExtension(doc.filePath);
     final base = sanitizeFileBaseName(doc.title);
     return '${base.isEmpty ? 'Signed document' : base}$ext';
   }
@@ -190,7 +190,9 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
           XFile(
             path,
             name: _shareFileName(),
-            mimeType: _document!.isPdf ? 'application/pdf' : 'image/png',
+            mimeType: _document!.isPdf
+                ? 'application/pdf'
+                : signedImageMimeType(_document!.filePath),
           ),
         ],
         subject: label,
@@ -216,13 +218,20 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
     }
     final dir = await Directory.systemTemp.createTemp('sigsync_share');
     final base = sanitizeFileBaseName(doc.title);
+    final ext = signedImageExtension(doc.filePath);
     final out = File(
-      '${dir.path}/${base.isEmpty ? 'Signed document' : base}.png',
+      '${dir.path}/${base.isEmpty ? 'Signed document' : base}$ext',
     );
     await out.writeAsBytes(bytes, flush: true);
     await SharePlus.instance.share(
       ShareParams(
-        files: [XFile(out.path, name: '${base.isEmpty ? 'Signed document' : base}.png', mimeType: 'image/png')],
+        files: [
+          XFile(
+            out.path,
+            name: '${base.isEmpty ? 'Signed document' : base}$ext',
+            mimeType: signedImageMimeType(doc.filePath),
+          ),
+        ],
         subject: label,
         text: label,
       ),
@@ -301,7 +310,9 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
           XFile(
             path,
             name: _shareFileName(),
-            mimeType: _document!.isPdf ? 'application/pdf' : 'image/png',
+            mimeType: _document!.isPdf
+                ? 'application/pdf'
+                : signedImageMimeType(_document!.filePath),
           ),
         ],
         subject: label,
@@ -320,7 +331,8 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
           child: switch (_status) {
             _Status.naming => _NamingView(
                 controller: _nameController,
-                extension: _fileType == 'pdf' ? '.pdf' : '.png',
+                // Opaque camera photos save as JPEG; PNG kept for alpha sources.
+                extension: _fileType == 'pdf' ? '.pdf' : '.jpg',
                 onContinue: _confirmNameAndSign,
               ),
             _Status.working => const _WorkingView(),

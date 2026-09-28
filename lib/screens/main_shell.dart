@@ -23,8 +23,20 @@ class MainShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final padding = MediaQuery.paddingOf(context);
     final bottomGap = padding.bottom + 18;
+    // Tabs (Settings / Documents / Signatures) are sibling branches of the
+    // shell — Android back would otherwise exit the app. Send non-Home tabs
+    // back to Home first; only Home may pop (close the app).
+    final onHomeTab = navigationShell.currentIndex == 0;
 
-    return Scaffold(
+    return PopScope(
+      canPop: onHomeTab,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (navigationShell.currentIndex != 0) {
+          navigationShell.goBranch(0);
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.primaryBackground,
       body: ColoredBox(
         // White outer board — clean professional frame (no pink shell).
@@ -126,6 +138,7 @@ class MainShell extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }

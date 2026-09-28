@@ -143,22 +143,38 @@ String formatDateStampText(DateTime date) {
   return '${months[date.month - 1]} ${date.day}, ${date.year}';
 }
 
-/// Result of [buildSignedDocument]: where the file was written, plus a PNG
-/// of the signed page so the caller can show it immediately without
-/// re-opening/re-rendering the (possibly large) output file.
+/// Result of [buildSignedDocument]: where the file was written, plus preview
+/// bytes of the signed page (PNG or JPEG) so the caller can show it without
+/// re-opening the output file.
 class SignedDocumentResult {
   const SignedDocumentResult({required this.filePath, required this.previewPng});
 
   final String filePath;
+
+  /// Preview image bytes (PNG or JPEG — `Image.memory` / `Image.file` handle both).
   final Uint8List previewPng;
 }
 
-/// Strips filesystem-illegal characters and any trailing .pdf/.png so callers
-/// can safely append the real extension. Empty after sanitize → caller should
-/// fall back to an auto-generated name.
+/// File extension for a signed image path (`.jpg` / `.png`). PDFs ignored.
+String signedImageExtension(String? path) {
+  final p = (path ?? '').toLowerCase();
+  if (p.endsWith('.jpg') || p.endsWith('.jpeg')) return '.jpg';
+  return '.png';
+}
+
+/// MIME type for a signed image path.
+String signedImageMimeType(String? path) {
+  return signedImageExtension(path) == '.jpg' ? 'image/jpeg' : 'image/png';
+}
+
+/// Strips filesystem-illegal characters and any trailing image/pdf extension
+/// so callers can safely append the real extension.
 String sanitizeFileBaseName(String input) {
   var s = input.trim();
-  s = s.replaceAll(RegExp(r'\.(pdf|png)$', caseSensitive: false), '');
+  s = s.replaceAll(
+    RegExp(r'\.(pdf|png|jpe?g|webp)$', caseSensitive: false),
+    '',
+  );
   s = s.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
   s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
   // Soft cap so paths stay portable on older Android storage layouts.
@@ -236,7 +252,6 @@ Future<SignedDocumentResult> buildSignedDocument({
     }
   }
 
-  final outPath = _uniqueOutPath(outDir, base, '.png');
   final baseBytes = await File(sourcePath).readAsBytes();
   final composited = await compositeStampOnImage(
     baseBytes: baseBytes,
@@ -244,8 +259,15 @@ Future<SignedDocumentResult> buildSignedDocument({
     placement: placement,
     datePlacement: datePlacement,
   );
-  await File(outPath).writeAsBytes(composited, flush: true);
-  return SignedDocumentResult(filePath: outPath, previewPng: composited);
+  final ext = composited.isJpeg ? '.jpg' : '.png';
+  final outPath = _uniqueOutPath(outDir, base, ext);
+  await File(outPath).writeAsBytes(composited.bytes, flush: true);
+  debugPrint(
+    '[document_signer] wrote signed image $outPath '
+    '(${composited.bytes.length} bytes, ${composited.width}x${composited.height}, '
+    'jpeg=${composited.isJpeg})',
+  );
+  return SignedDocumentResult(filePath: outPath, previewPng: composited.bytes);
 }
 
 /// Loads the original PDF with Syncfusion, draws stamp (+ optional date) on
@@ -397,12 +419,13 @@ Future<Uint8List> _buildSignedPdfLegacy({
 
       final isSignedPage = i == placement.pageIndex;
       final finalBytes = isSignedPage
-          ? await compositeStampOnImage(
+          ? (await compositeStampOnImage(
               baseBytes: pageBytes,
               stampBytes: stampBytes,
               placement: placement,
               datePlacement: datePlacement,
-            )
+            ))
+              .bytes
           : pageBytes;
       if (isSignedPage) signedPagePreview = finalBytes;
 
@@ -512,32 +535,53 @@ img.Image decodeImageBakingOrientation(Uint8List bytes) {
   return img.bakeOrientation(decoded);
 }
 
-/// Rewrites [path] in place with EXIF orientation baked into the pixels
-/// (and soft-caps huge camera photos so signing doesn't OOM). No-op for
-/// non-image paths or undecodable files.
-Future<void> normalizeImageFileOrientation(String path) async {
-  final lower = path.toLowerCase();
-  final isImage = lower.endsWith('.jpg') ||
-      lower.endsWith('.jpeg') ||
-      lower.endsWith('.png') ||
-      lower.endsWith('.webp') ||
-      lower.endsWith('.heic') ||
-      lower.endsWith('.heif');
-  if (!isImage) return;
-
-  final file = File(path);
-  if (!await file.exists()) return;
-
-  final bytes = await file.readAsBytes();
-  img.Image oriented;
-  try {
-    oriented = decodeImageBakingOrientation(bytes);
-  } catch (_) {
-    return;
+bool _imageHasTransparency(img.Image image) {
+  if (image.numChannels < 4) return false;
+  // Sparse sample — enough to catch real alpha without scanning 12MP.
+  final stepX = math.max(1, image.width ~/ 128);
+  final stepY = math.max(1, image.height ~/ 128);
+  for (var y = 0; y < image.height; y += stepY) {
+    for (var x = 0; x < image.width; x += stepX) {
+      if (image.getPixel(x, y).a < 255) return true;
+    }
   }
+  return false;
+}
 
-  // Soft cap: phone cameras often shoot 12MP+; keep signing memory-safe.
-  const maxSide = 4096;
+/// Inputs for [_normalizeImageIsolate] — plain data for `compute()`.
+class _NormalizeImageParams {
+  const _NormalizeImageParams({
+    required this.bytes,
+    required this.sourcePath,
+  });
+
+  final Uint8List bytes;
+  final String sourcePath;
+}
+
+class _NormalizeImageResult {
+  const _NormalizeImageResult({
+    required this.bytes,
+    required this.outPath,
+    required this.width,
+    required this.height,
+  });
+
+  final Uint8List bytes;
+  final String outPath;
+  final int width;
+  final int height;
+}
+
+_NormalizeImageResult _normalizeImageIsolate(_NormalizeImageParams params) {
+  final sw = Stopwatch()..start();
+  var oriented = decodeImageBakingOrientation(params.bytes);
+  debugPrint(
+    '[normalize] decode+orient ${oriented.width}x${oriented.height} '
+    'in ${sw.elapsedMilliseconds}ms (in=${params.bytes.length}b)',
+  );
+
+  const maxSide = 2560;
   if (oriented.width > maxSide || oriented.height > maxSide) {
     final scale = maxSide / math.max(oriented.width, oriented.height);
     oriented = img.copyResize(
@@ -546,37 +590,162 @@ Future<void> normalizeImageFileOrientation(String path) async {
       height: (oriented.height * scale).round().clamp(1, maxSide),
       interpolation: img.Interpolation.cubic,
     );
+    debugPrint(
+      '[normalize] resized to ${oriented.width}x${oriented.height} '
+      'in ${sw.elapsedMilliseconds}ms',
+    );
   }
 
-  final outBytes = lower.endsWith('.png')
-      ? Uint8List.fromList(img.encodePng(oriented))
-      : Uint8List.fromList(img.encodeJpg(oriented, quality: 92));
-  await file.writeAsBytes(outBytes, flush: true);
+  final hasAlpha = _imageHasTransparency(oriented);
+  final lower = params.sourcePath.toLowerCase();
+  late final Uint8List outBytes;
+  late final String outPath;
+  if (hasAlpha) {
+    outBytes = Uint8List.fromList(img.encodePng(oriented));
+    outPath = lower.endsWith('.png')
+        ? params.sourcePath
+        : params.sourcePath.replaceAll(RegExp(r'\.[^.]+$'), '.png');
+  } else {
+    outBytes = Uint8List.fromList(img.encodeJpg(oriented, quality: 88));
+    outPath = (lower.endsWith('.jpg') || lower.endsWith('.jpeg'))
+        ? params.sourcePath
+        : params.sourcePath.replaceAll(RegExp(r'\.[^.]+$'), '.jpg');
+  }
+  debugPrint(
+    '[normalize] encode ${hasAlpha ? 'png' : 'jpg'} ${outBytes.length}b '
+    'in ${sw.elapsedMilliseconds}ms → $outPath',
+  );
+  return _NormalizeImageResult(
+    bytes: outBytes,
+    outPath: outPath,
+    width: oriented.width,
+    height: oriented.height,
+  );
 }
 
-/// Composites [stampBytes] (a transparent signature PNG) onto [baseBytes]
-/// at [placement]'s fractional geometry, resized and rotated to match.
-/// When [datePlacement] is non-null, also draws the date stamp. Omitting
-/// it leaves the output pixel-identical to signature-only compositing.
-Future<Uint8List> compositeStampOnImage({
-  required Uint8List baseBytes,
-  required Uint8List stampBytes,
-  required StampPlacement placement,
-  DateStampPlacement? datePlacement,
-}) async {
-  // Bake EXIF so camera photos use the same width/height the Place screen
-  // showed (Flutter often auto-orients; package:image does not by default).
-  final base =
-      decodeImageBakingOrientation(baseBytes).convert(numChannels: 4);
-  final stampDecoded = img.decodeImage(stampBytes);
+/// Rewrites [path] with EXIF orientation baked in and soft-caps huge camera
+/// photos (long side ≤ 2560). Opaque photos are re-saved as JPEG (~88);
+/// PNG is kept only when transparency is present. Returns the path actually
+/// written (may change extension from `.png` → `.jpg`).
+Future<String> normalizeImageFileOrientation(String path) async {
+  final lower = path.toLowerCase();
+  final isImage = lower.endsWith('.jpg') ||
+      lower.endsWith('.jpeg') ||
+      lower.endsWith('.png') ||
+      lower.endsWith('.webp') ||
+      lower.endsWith('.heic') ||
+      lower.endsWith('.heif');
+  if (!isImage) return path;
+
+  final file = File(path);
+  if (!await file.exists()) return path;
+
+  final bytes = await file.readAsBytes();
+  _NormalizeImageResult result;
+  try {
+    result = await compute(
+      _normalizeImageIsolate,
+      _NormalizeImageParams(bytes: bytes, sourcePath: path),
+    );
+  } catch (e, st) {
+    debugPrint('[normalize] failed: $e\n$st');
+    return path;
+  }
+
+  await File(result.outPath).writeAsBytes(result.bytes, flush: true);
+  if (result.outPath != path) {
+    try {
+      await file.delete();
+    } catch (_) {}
+  }
+  return result.outPath;
+}
+
+/// Plain-data inputs for [compositeStampOnImage] isolate work.
+class CompositeStampParams {
+  const CompositeStampParams({
+    required this.baseBytes,
+    required this.stampBytes,
+    required this.xFrac,
+    required this.yFrac,
+    required this.widthFrac,
+    required this.heightFrac,
+    required this.rotationRadians,
+    this.dateStampPng,
+    this.dateXFrac,
+    this.dateYFrac,
+    this.dateWidthFrac,
+    this.dateHeightFrac,
+    this.jpegQuality = 92,
+  });
+
+  final Uint8List baseBytes;
+  final Uint8List stampBytes;
+  final double xFrac;
+  final double yFrac;
+  final double widthFrac;
+  final double heightFrac;
+  final double rotationRadians;
+  final Uint8List? dateStampPng;
+  final double? dateXFrac;
+  final double? dateYFrac;
+  final double? dateWidthFrac;
+  final double? dateHeightFrac;
+  final int jpegQuality;
+}
+
+/// Output of [compositeStampOnImage].
+class CompositeStampResult {
+  const CompositeStampResult({
+    required this.bytes,
+    required this.isJpeg,
+    required this.width,
+    required this.height,
+  });
+
+  final Uint8List bytes;
+  final bool isJpeg;
+  final int width;
+  final int height;
+}
+
+class _ImageDims {
+  const _ImageDims(this.width, this.height);
+  final int width;
+  final int height;
+}
+
+_ImageDims _imageDimsIsolate(Uint8List bytes) {
+  final sw = Stopwatch()..start();
+  final oriented = decodeImageBakingOrientation(bytes);
+  debugPrint(
+    '[composite] dims probe ${oriented.width}x${oriented.height} '
+    'in ${sw.elapsedMilliseconds}ms',
+  );
+  return _ImageDims(oriented.width, oriented.height);
+}
+
+CompositeStampResult _compositeStampIsolate(CompositeStampParams params) {
+  final sw = Stopwatch()..start();
+  final baked = decodeImageBakingOrientation(params.baseBytes);
+  final sourceHasAlpha = _imageHasTransparency(baked);
+  debugPrint(
+    '[composite] decode base ${baked.width}x${baked.height} '
+    'alpha=$sourceHasAlpha in ${sw.elapsedMilliseconds}ms '
+    '(in=${params.baseBytes.length}b)',
+  );
+
+  final base = baked.convert(numChannels: 4);
+  final stampDecoded = img.decodeImage(params.stampBytes);
   if (stampDecoded == null) {
     throw StateError('Could not decode signature stamp image');
   }
   var stamp = stampDecoded.convert(numChannels: 4);
 
-  final stampW = (placement.widthFrac * base.width).round().clamp(1, base.width);
+  final stampW =
+      (params.widthFrac * base.width).round().clamp(1, base.width);
   final stampH =
-      (placement.heightFrac * base.height).round().clamp(1, base.height);
+      (params.heightFrac * base.height).round().clamp(1, base.height);
   stamp = img.copyResize(
     stamp,
     width: stampW,
@@ -584,8 +753,8 @@ Future<Uint8List> compositeStampOnImage({
     interpolation: img.Interpolation.cubic,
   );
 
-  if (placement.rotationRadians != 0) {
-    final degrees = placement.rotationRadians * 180 / math.pi;
+  if (params.rotationRadians != 0) {
+    final degrees = params.rotationRadians * 180 / math.pi;
     stamp = img.copyRotate(
       stamp,
       angle: degrees,
@@ -593,27 +762,27 @@ Future<Uint8List> compositeStampOnImage({
     );
   }
 
-  // Rotating grows the canvas to fit the rotated content, so re-centre on
-  // where the (unrotated) box was — matching the Place screen's
-  // Transform.rotate, which pivots around the box centre.
-  final centerX = placement.xFrac * base.width + stampW / 2;
-  final centerY = placement.yFrac * base.height + stampH / 2;
+  final centerX = params.xFrac * base.width + stampW / 2;
+  final centerY = params.yFrac * base.height + stampH / 2;
   final dstX = (centerX - stamp.width / 2).round();
   final dstY = (centerY - stamp.height / 2).round();
 
   img.compositeImage(base, stamp, dstX: dstX, dstY: dstY);
+  debugPrint(
+    '[composite] stamp layered at ($dstX,$dstY) '
+    'in ${sw.elapsedMilliseconds}ms',
+  );
 
-  if (datePlacement != null) {
+  final datePng = params.dateStampPng;
+  if (datePng != null &&
+      params.dateXFrac != null &&
+      params.dateYFrac != null &&
+      params.dateWidthFrac != null &&
+      params.dateHeightFrac != null) {
     final dateW =
-        (datePlacement.widthFrac * base.width).round().clamp(1, base.width);
+        (params.dateWidthFrac! * base.width).round().clamp(1, base.width);
     final dateH =
-        (datePlacement.heightFrac * base.height).round().clamp(1, base.height);
-    final datePng = await renderDateStampPng(
-      text: datePlacement.text,
-      style: datePlacement.style,
-      width: dateW.toDouble(),
-      height: dateH.toDouble(),
-    );
+        (params.dateHeightFrac! * base.height).round().clamp(1, base.height);
     var dateImg = img.decodeImage(datePng)!.convert(numChannels: 4);
     dateImg = img.copyResize(
       dateImg,
@@ -621,10 +790,90 @@ Future<Uint8List> compositeStampOnImage({
       height: dateH,
       interpolation: img.Interpolation.cubic,
     );
-    final dx = (datePlacement.xFrac * base.width).round();
-    final dy = (datePlacement.yFrac * base.height).round();
+    final dx = (params.dateXFrac! * base.width).round();
+    final dy = (params.dateYFrac! * base.height).round();
     img.compositeImage(base, dateImg, dstX: dx, dstY: dy);
+    debugPrint(
+      '[composite] date layered at ($dx,$dy) '
+      'in ${sw.elapsedMilliseconds}ms',
+    );
   }
 
-  return Uint8List.fromList(img.encodePng(base));
+  final encodeJpeg = !sourceHasAlpha;
+  final out = encodeJpeg
+      ? Uint8List.fromList(
+          img.encodeJpg(base, quality: params.jpegQuality),
+        )
+      : Uint8List.fromList(img.encodePng(base));
+  debugPrint(
+    '[composite] encode ${encodeJpeg ? 'jpeg' : 'png'} ${out.length}b '
+    'in ${sw.elapsedMilliseconds}ms',
+  );
+  return CompositeStampResult(
+    bytes: out,
+    isJpeg: encodeJpeg,
+    width: base.width,
+    height: base.height,
+  );
 }
+
+/// Composites [stampBytes] (a transparent signature PNG) onto [baseBytes]
+/// at [placement]'s fractional geometry. Heavy decode/resize/encode runs in
+/// a background isolate via `compute()`. Date stamp PNGs are rendered on the
+/// main isolate (dart:ui) then passed in as bytes.
+Future<CompositeStampResult> compositeStampOnImage({
+  required Uint8List baseBytes,
+  required Uint8List stampBytes,
+  required StampPlacement placement,
+  DateStampPlacement? datePlacement,
+}) async {
+  final total = Stopwatch()..start();
+  debugPrint(
+    '[composite] start base=${baseBytes.length}b stamp=${stampBytes.length}b',
+  );
+
+  Uint8List? datePng;
+  if (datePlacement != null) {
+    final dims = await compute(_imageDimsIsolate, baseBytes);
+    final dateW =
+        (datePlacement.widthFrac * dims.width).clamp(1, dims.width.toDouble());
+    final dateH = (datePlacement.heightFrac * dims.height)
+        .clamp(1, dims.height.toDouble());
+    datePng = await renderDateStampPng(
+      text: datePlacement.text,
+      style: datePlacement.style,
+      width: dateW.toDouble(),
+      height: dateH.toDouble(),
+    );
+    debugPrint(
+      '[composite] date png ready ${datePng.length}b '
+      'at ${total.elapsedMilliseconds}ms',
+    );
+  }
+
+  final result = await compute(
+    _compositeStampIsolate,
+    CompositeStampParams(
+      baseBytes: baseBytes,
+      stampBytes: stampBytes,
+      xFrac: placement.xFrac,
+      yFrac: placement.yFrac,
+      widthFrac: placement.widthFrac,
+      heightFrac: placement.heightFrac,
+      rotationRadians: placement.rotationRadians,
+      dateStampPng: datePng,
+      dateXFrac: datePlacement?.xFrac,
+      dateYFrac: datePlacement?.yFrac,
+      dateWidthFrac: datePlacement?.widthFrac,
+      dateHeightFrac: datePlacement?.heightFrac,
+      jpegQuality: 92,
+    ),
+  );
+  debugPrint(
+    '[composite] total ${total.elapsedMilliseconds}ms → '
+    '${result.width}x${result.height} ${result.bytes.length}b '
+    'jpeg=${result.isJpeg}',
+  );
+  return result;
+}
+

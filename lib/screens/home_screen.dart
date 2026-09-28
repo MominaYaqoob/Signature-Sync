@@ -155,8 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     subtitle: 'Signed · ${_shortDate(doc.updatedAt)}',
                     onShare: () {
                       debugPrint('[Share] tapped for doc: ${doc.id}');
-                      // One tap → Quick Share with this document pre-selected.
-                      context.push('/quick-share', extra: doc);
+                      shareDocumentFile(context, doc);
                     },
                     onMenu: () {
                       showDocumentCardMenu(
@@ -166,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           debugPrint(
                             '[Share] menu share for doc: ${doc.id}',
                           );
-                          context.push('/quick-share', extra: doc);
+                          shareDocumentFile(context, doc);
                         },
                       );
                     },

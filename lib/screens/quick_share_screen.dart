@@ -9,10 +9,10 @@ import '../services/ads_service.dart';
 import '../services/document_signer.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
+import '../widgets/document_actions.dart';
 import '../widgets/navy_app_header.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/signature_actions.dart' show kDeleteRed;
-import '../widgets/signature_visual.dart';
 
 String _shortDate(DateTime d) {
   const months = [
@@ -25,8 +25,9 @@ String _shortDate(DateTime d) {
 class QuickShareScreen extends StatefulWidget {
   const QuickShareScreen({super.key, this.initialDocument});
 
-  /// When set (e.g. from a home/documents card share icon), skip the
-  /// document-picker list and go straight to applying the default signature.
+  /// Legacy: if a document is passed, share its existing file and pop.
+  /// Card share icons no longer route here — they call [shareDocumentFile]
+  /// directly. Kept so older navigation extras still behave safely.
   final DocumentModel? initialDocument;
 
   @override
@@ -43,70 +44,15 @@ class _QuickShareScreenState extends State<QuickShareScreen> {
     if (widget.initialDocument != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _preselectedHandled) return;
-        _launchPreselected(widget.initialDocument!);
+        _sharePreselected(widget.initialDocument!);
       });
     }
   }
 
-  void _launchPreselected(DocumentModel doc) {
-    debugPrint(
-      '[QuickShare] preselected launch id=${doc.id} '
-      'path=${doc.filePath} title=${doc.title}',
-    );
-
-    final path = doc.filePath;
-    if (path == null || path.isEmpty) {
-      setState(() => _preselectedHandled = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('This document has no file to share'),
-        ),
-      );
-      return;
-    }
-    if (!File(path).existsSync()) {
-      setState(() => _preselectedHandled = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Document file is missing — it may have been deleted',
-          ),
-        ),
-      );
-      return;
-    }
-
-    final signatures = StorageService.getAllSignatures();
-    final defaultSig = StorageService.getDefaultSignature() ??
-        (signatures.isNotEmpty ? signatures.first : null);
-    if (defaultSig == null) {
-      // Fall back to the picker UI so the user isn't stuck on a spinner.
-      setState(() => _preselectedHandled = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Create a signature first')),
-      );
-      return;
-    }
-
-    try {
-      _preselectedHandled = true;
-      // Replace so Back from success returns to Home/Documents, not the picker.
-      context.pushReplacement(
-        '/quick-share/success',
-        extra: <String, Object>{
-          'document': doc,
-          'signature': defaultSig,
-        },
-      );
-      debugPrint('[QuickShare] navigated to success for ${doc.id}');
-    } catch (e, st) {
-      debugPrint('[QuickShare] preselected navigation failed: $e\n$st');
-      if (!mounted) return;
-      setState(() => _preselectedHandled = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not open Quick Share: $e')),
-      );
-    }
+  Future<void> _sharePreselected(DocumentModel doc) async {
+    _preselectedHandled = true;
+    await shareDocumentFile(context, doc);
+    if (mounted) context.pop();
   }
 
   @override
@@ -119,9 +65,6 @@ class _QuickShareScreenState extends State<QuickShareScreen> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final signatures = StorageService.getAllSignatures();
-    final defaultSig = StorageService.getDefaultSignature() ??
-        (signatures.isNotEmpty ? signatures.first : null);
     final documents = StorageService.getAllDocuments();
 
     // Brief placeholder while we hand off a pre-selected document — avoids
@@ -196,90 +139,35 @@ class _QuickShareScreenState extends State<QuickShareScreen> {
                 ),
                 children: [
                   Text(
-                    'Default signature',
-                    style: AppTextStyles.titleMedium.copyWith(fontSize: 14),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Container(
-                    padding: AppSpacing.cardPadding,
-                    decoration: AppDecorations.card(
-                      radius: AppRadii.md,
-                      prominent: true,
-                      color: AppColors.softBlue,
-                      borderColor:
-                          AppColors.accentBlue.withValues(alpha: 0.22),
-                    ),
-                    child: Column(
-                      children: [
-                        if (defaultSig == null)
-                          Text(
-                            'No signature yet',
-                            style: AppTextStyles.signaturePreview(
-                              color: AppColors.accentBlue,
-                              size: 40,
-                            ),
-                          )
-                        else
-                          SizedBox(
-                            height: 56,
-                            child: SignatureVisual.fromModel(
-                              defaultSig,
-                              color: AppColors.accentBlue,
-                              fontSize: 40,
-                              showTransparencyGrid: true,
-                            ),
-                          ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(
-                          defaultSig == null
-                              ? 'Create a signature first'
-                              : 'Ready to apply',
-                          style: AppTextStyles.labelMedium.copyWith(
-                            color: defaultSig == null
-                                ? AppColors.textSecondary
-                                : AppColors.accentBlue,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Apply to a recent document',
+                    'Share a signed document',
                     style: AppTextStyles.titleMedium.copyWith(fontSize: 14),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Tap a document to stamp your default signature onto '
-                    'it near the bottom-right corner.',
+                    'Tap a document to share the existing file as-is — '
+                    'nothing is re-signed or duplicated.',
                     style: AppTextStyles.secondary.copyWith(fontSize: 13),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  ...documents.map(
-                    (doc) => Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _ShareDocumentTile(
-                        document: doc,
-                        onTap: () {
-                          if (defaultSig == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Create a signature first'),
-                              ),
-                            );
-                            return;
-                          }
-                          context.push(
-                            '/quick-share/success',
-                            extra: <String, Object>{
-                              'document': doc,
-                              'signature': defaultSig,
-                            },
-                          );
-                        },
+                  if (documents.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.lg),
+                      child: Text(
+                        'No signed documents yet. Sign a document first, '
+                        'then share it from here.',
+                        style: AppTextStyles.secondary.copyWith(fontSize: 13),
+                      ),
+                    )
+                  else
+                    ...documents.map(
+                      (doc) => Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: _ShareDocumentTile(
+                          document: doc,
+                          onTap: () => shareDocumentFile(context, doc),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),

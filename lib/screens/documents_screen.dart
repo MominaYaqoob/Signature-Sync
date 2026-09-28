@@ -57,7 +57,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       context,
       document: doc,
       onShare: () {
-        context.push('/quick-share', extra: doc);
+        shareDocumentFile(context, doc);
       },
       onDeleted: _reload,
     );
@@ -219,7 +219,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                             ),
                             onShare: () {
                               debugPrint('[Share] tapped for doc: ${doc.id}');
-                              context.push('/quick-share', extra: doc);
+                              shareDocumentFile(context, doc);
                             },
                             onMenu: () => _openMenu(doc),
                           );

@@ -43,8 +43,7 @@ class _SignUploadScreenState extends State<SignUploadScreen> {
     await File(sourcePath).copy(dest.path);
     // Camera / gallery JPEGs often only look upright because of EXIF tags;
     // bake them so Place + signing see the same pixel dimensions.
-    await normalizeImageFileOrientation(dest.path);
-    return dest.path;
+    return normalizeImageFileOrientation(dest.path);
   }
 
   void _showError(String message) {

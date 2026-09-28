@@ -34,17 +34,18 @@ void main() {
         ),
       );
 
-      final decoded = img.decodePng(result)!;
-      // Centre of the stamp (110, 110) should be red.
+      expect(result.isJpeg, isTrue);
+      final decoded = img.decodeImage(result.bytes)!;
+      // Centre of the stamp (110, 110) should be red (JPEG may be ±1).
       final centre = decoded.getPixel(110, 110);
-      expect(centre.r, 255);
-      expect(centre.g, 0);
-      expect(centre.a, 255);
+      expect(centre.r, greaterThan(250));
+      expect(centre.g, lessThan(5));
+      expect(centre.b, lessThan(5));
       // Far corner, untouched by the stamp, stays white.
       final corner = decoded.getPixel(5, 5);
-      expect(corner.r, 255);
-      expect(corner.g, 255);
-      expect(corner.b, 255);
+      expect(corner.r, greaterThan(250));
+      expect(corner.g, greaterThan(250));
+      expect(corner.b, greaterThan(250));
     });
 
     test('a transparent stamp does not paint over the page', () async {
@@ -64,7 +65,7 @@ void main() {
         ),
       );
 
-      final decoded = img.decodePng(result)!;
+      final decoded = img.decodeImage(result.bytes)!;
       final centre = decoded.getPixel(50, 50);
       expect(centre.r, 255);
       expect(centre.g, 255);
@@ -115,7 +116,8 @@ void main() {
           );
 
           expect(File(result.filePath).existsSync(), isTrue);
-          final decodedOut = img.decodePng(
+          expect(result.filePath.toLowerCase().endsWith('.jpg'), isTrue);
+          final decodedOut = img.decodeImage(
             await File(result.filePath).readAsBytes(),
           )!;
           // The output is the same page size and has some non-white pixels

@@ -40,6 +40,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
   Uint8List? _pageBytes;
   double _pageAspect = 0.72;
   bool _loadingPage = true;
+  bool _applying = false;
   String? _pageError;
 
   late List<SignatureModel> _signatures;
@@ -120,7 +121,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
       } else {
         // Ensure EXIF is baked before measuring aspect / placing the stamp
         // (covers docs imported before this fix, and any missed normalize).
-        await normalizeImageFileOrientation(_filePath);
+        _filePath = await normalizeImageFileOrientation(_filePath);
         bytes = await File(_filePath).readAsBytes();
       }
 
@@ -152,6 +153,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
 
   bool get _canApply =>
       !_loadingPage &&
+      !_applying &&
       _pageError == null &&
       _pageBytes != null &&
       _signatures.isNotEmpty;
@@ -250,17 +252,20 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
   }
 
   Future<void> _apply() async {
-    if (!_canApply) return;
+    if (!_canApply || _applying) return;
+    setState(() => _applying = true);
     try {
       final signature = _signatures[_selectedSig];
       final docSize = _docSize;
       final position = _position;
       if (docSize == null || position == null) {
         _showError('Could not read signature placement — try again');
+        if (mounted) setState(() => _applying = false);
         return;
       }
       if (_filePath.isEmpty || !File(_filePath).existsSync()) {
         _showError('Document file is missing — go back and import again');
+        if (mounted) setState(() => _applying = false);
         return;
       }
 
@@ -293,13 +298,15 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
       // End of the sign-document flow — one of the app's ad plan placements.
       AdsService.instance.showInterstitial(
         onComplete: () {
-          if (context.mounted) {
-            context.push('/sign-document/success', extra: extra);
-          }
+          if (!mounted) return;
+          // Clear applying before leaving so a back-navigation isn't stuck.
+          setState(() => _applying = false);
+          context.push('/sign-document/success', extra: extra);
         },
       );
     } catch (e) {
       _showError('Could not start signing: $e');
+      if (mounted) setState(() => _applying = false);
     }
   }
 
@@ -307,9 +314,11 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
-      body: SafeArea(
-        child: Column(
-          children: [
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 12, 0),
               child: NavyAppHeader(
@@ -416,7 +425,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
                       child: _ToolButton(
                         icon: Icons.gesture_rounded,
                         label: 'Signature',
-                        onTap: _pickSignature,
+                        onTap: _applying ? null : _pickSignature,
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -424,7 +433,9 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
                       child: _ToolButton(
                         icon: Icons.photo_size_select_large_rounded,
                         label: 'Resize',
-                        onTap: () => _nudgeResize(enlarge: true),
+                        onTap: _applying
+                            ? null
+                            : () => _nudgeResize(enlarge: true),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -432,7 +443,7 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
                       child: _ToolButton(
                         icon: Icons.rotate_right_rounded,
                         label: 'Rotate',
-                        onTap: _rotate,
+                        onTap: _applying ? null : _rotate,
                       ),
                     ),
                   ],
@@ -440,6 +451,27 @@ class _SignPlaceScreenState extends State<SignPlaceScreen> {
               ),
           ],
         ),
+          ),
+          if (_applying)
+            const Positioned.fill(
+              child: ColoredBox(
+                color: Color(0x66000000),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: AppColors.accentPurple),
+                      SizedBox(height: 16),
+                      Text(
+                        'Preparing signed document…',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -782,7 +814,7 @@ class _ToolButton extends StatelessWidget {
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
