@@ -49,6 +49,33 @@ class _QuickShareScreenState extends State<QuickShareScreen> {
   }
 
   void _launchPreselected(DocumentModel doc) {
+    debugPrint(
+      '[QuickShare] preselected launch id=${doc.id} '
+      'path=${doc.filePath} title=${doc.title}',
+    );
+
+    final path = doc.filePath;
+    if (path == null || path.isEmpty) {
+      setState(() => _preselectedHandled = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This document has no file to share'),
+        ),
+      );
+      return;
+    }
+    if (!File(path).existsSync()) {
+      setState(() => _preselectedHandled = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Document file is missing — it may have been deleted',
+          ),
+        ),
+      );
+      return;
+    }
+
     final signatures = StorageService.getAllSignatures();
     final defaultSig = StorageService.getDefaultSignature() ??
         (signatures.isNotEmpty ? signatures.first : null);
@@ -60,15 +87,26 @@ class _QuickShareScreenState extends State<QuickShareScreen> {
       );
       return;
     }
-    _preselectedHandled = true;
-    // Replace so Back from success returns to Home/Documents, not the picker.
-    context.pushReplacement(
-      '/quick-share/success',
-      extra: <String, Object>{
-        'document': doc,
-        'signature': defaultSig,
-      },
-    );
+
+    try {
+      _preselectedHandled = true;
+      // Replace so Back from success returns to Home/Documents, not the picker.
+      context.pushReplacement(
+        '/quick-share/success',
+        extra: <String, Object>{
+          'document': doc,
+          'signature': defaultSig,
+        },
+      );
+      debugPrint('[QuickShare] navigated to success for ${doc.id}');
+    } catch (e, st) {
+      debugPrint('[QuickShare] preselected navigation failed: $e\n$st');
+      if (!mounted) return;
+      setState(() => _preselectedHandled = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open Quick Share: $e')),
+      );
+    }
   }
 
   @override

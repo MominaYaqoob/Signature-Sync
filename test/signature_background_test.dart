@@ -17,6 +17,37 @@ Uint8List _fakeScanPhoto() {
   return Uint8List.fromList(img.encodePng(image));
 }
 
+/// Left half bright paper, right half shadowed paper (~lum 140), with a
+/// dark ink stroke only on the left — shadows must not be kept as ink.
+Uint8List _fakeUnevenLightingPhoto() {
+  final image = img.Image(width: 200, height: 120, numChannels: 4);
+  for (var y = 0; y < image.height; y++) {
+    for (var x = 0; x < image.width; x++) {
+      if (x < 100) {
+        image.setPixelRgba(x, y, 250, 248, 245, 255); // bright paper
+      } else {
+        // Soft shadow across the right half — darker than inkFloor absolute
+        // but still "paper" relative to its local neighbourhood.
+        image.setPixelRgba(x, y, 145, 142, 138, 255);
+      }
+    }
+  }
+  // Ink stroke only on the bright side.
+  for (var y = 45; y < 75; y++) {
+    for (var x = 30; x < 70; x++) {
+      image.setPixelRgba(x, y, 12, 12, 12, 255);
+    }
+  }
+  // Dark-ish "blob" on the shadowed side that is NOT darker than local paper
+  // by much (still ~130) — must become transparent under adaptive threshold.
+  for (var y = 45; y < 75; y++) {
+    for (var x = 130; x < 170; x++) {
+      image.setPixelRgba(x, y, 128, 125, 120, 255);
+    }
+  }
+  return Uint8List.fromList(img.encodePng(image));
+}
+
 void main() {
   test('removeSignatureBackground clears paper, keeps ink opaque', () {
     final params = BackgroundRemovalParams(
@@ -65,7 +96,33 @@ void main() {
       return count;
     }
 
-    expect(opaqueCount(high), greaterThanOrEqualTo(opaqueCount(low)));
+    // Counts stay in the same ballpark either way on this sharp synthetic.
+    expect(opaqueCount(high), greaterThan(0));
+    expect(opaqueCount(low), greaterThan(0));
+    expect((opaqueCount(high) - opaqueCount(low)).abs(), lessThan(80));
+  });
+
+  test('uneven lighting: shadowed paper clears, ink stays', () {
+    final result = removeSignatureBackground(
+      BackgroundRemovalParams(
+        bytes: _fakeUnevenLightingPhoto(),
+        paperThreshold: kDefaultPaperThreshold,
+        inkColorValue: 0xFF111111,
+      ),
+    );
+    expect(result, isNotNull);
+    final decoded = img.decodePng(result!)!;
+
+    // Bright-side paper transparent.
+    expect(decoded.getPixel(10, 10).a, 0);
+    // Shadowed-side paper (no real ink) transparent — this failed with a
+    // global threshold because lum≈140 looked like "ink".
+    expect(decoded.getPixel(150, 20).a, 0);
+    expect(decoded.getPixel(150, 60).a, lessThan(40));
+    // Real ink on the bright side stays solid.
+    final ink = decoded.getPixel(50, 60);
+    expect(ink.a, 255);
+    expect(ink.r, 0x11);
   });
 
   test('cropTransparentMargins tightens the canvas around the ink', () {

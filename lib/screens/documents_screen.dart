@@ -218,6 +218,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                               extra: doc,
                             ),
                             onShare: () {
+                              debugPrint('[Share] tapped for doc: ${doc.id}');
                               context.push('/quick-share', extra: doc);
                             },
                             onMenu: () => _openMenu(doc),
@@ -252,79 +253,88 @@ class _DocumentHistoryCard extends StatelessWidget {
         ? Icons.picture_as_pdf_rounded
         : Icons.image_outlined;
 
-    return PressableScale(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(AppRadii.md),
-      child: Container(
-        decoration: AppDecorations.card(
-          radius: AppRadii.md,
-          borderColor: tint.withValues(alpha: 0.22),
+    // Share/menu must NOT sit inside the card's PressableScale — nested
+    // InkWells often let the outer tap win on device, so Share looked "dead"
+    // (user actually opened detail). Tap target: title row only → detail.
+    return Container(
+      decoration: AppDecorations.card(
+        radius: AppRadii.md,
+        borderColor: tint.withValues(alpha: 0.22),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.md,
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.sm,
-            vertical: AppSpacing.md,
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: tint.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(AppRadii.sm),
-                ),
-                child: Icon(icon, color: tint, size: 20),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          children: [
+            Expanded(
+              child: PressableScale(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(AppRadii.sm),
+                child: Row(
                   children: [
-                    Text(
-                      document.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.tileLabel,
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: tint.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(AppRadii.sm),
+                      ),
+                      child: Icon(icon, color: tint, size: 20),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Signed · ${_shortDate(document.updatedAt)}',
-                      style: AppTextStyles.labelMedium.copyWith(
-                        fontSize: 11,
-                        color: AppColors.accentBlue,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            document.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTextStyles.tileLabel,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Signed · ${_shortDate(document.updatedAt)}',
+                            style: AppTextStyles.labelMedium.copyWith(
+                              fontSize: 11,
+                              color: AppColors.accentBlue,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              PressableScale(
-                onTap: onShare,
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Icon(
-                    Icons.ios_share_rounded,
-                    color: AppColors.textSecondary,
-                    size: 22,
-                  ),
+            ),
+            PressableScale(
+              onTap: onShare,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              child: const Padding(
+                padding: EdgeInsets.all(10),
+                child: Icon(
+                  Icons.ios_share_rounded,
+                  color: AppColors.textSecondary,
+                  size: 22,
                 ),
               ),
-              const SizedBox(width: 4),
-              PressableScale(
-                onTap: onMenu,
-                borderRadius: BorderRadius.circular(AppRadii.sm),
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Icon(
-                    Icons.more_vert_rounded,
-                    color: AppColors.textSecondary,
-                    size: 20,
-                  ),
+            ),
+            const SizedBox(width: 4),
+            PressableScale(
+              onTap: onMenu,
+              borderRadius: BorderRadius.circular(AppRadii.sm),
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(
+                  Icons.more_vert_rounded,
+                  color: AppColors.textSecondary,
+                  size: 20,
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
