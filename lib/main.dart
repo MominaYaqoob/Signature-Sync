@@ -68,11 +68,14 @@ void main() {
       ),
     );
     runApp(
-      DevicePreview(
-        // Chrome / web pe mobile frames; real phone pe off.
-        enabled: kIsWeb,
-        builder: (context) => const SignatureSyncApp(),
-      ),
+      // DevicePreview must never wrap release builds (perf + odd overlays).
+      kReleaseMode
+          ? const SignatureSyncApp()
+          : DevicePreview(
+              // Chrome / web pe mobile frames; real phone pe off.
+              enabled: kIsWeb,
+              builder: (context) => const SignatureSyncApp(),
+            ),
     );
   }, (error, stack) {
     debugPrint('[Zone] uncaught error: $error\n$stack');
@@ -96,8 +99,8 @@ class _SignatureSyncAppState extends State<SignatureSyncApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       themeMode: ThemeMode.light,
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
+      locale: kReleaseMode ? null : DevicePreview.locale(context),
+      builder: kReleaseMode ? null : DevicePreview.appBuilder,
       routerConfig: _router,
     );
   }

@@ -219,7 +219,7 @@ class _HomeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sign smart',
+                  'Signature Maker & eSign PDF',
                   style: AppTextStyles.titleLarge.copyWith(
                     fontSize: 24,
                     height: 1.2,

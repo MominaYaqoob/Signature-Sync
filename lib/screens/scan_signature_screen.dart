@@ -2,14 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../services/ads_service.dart';
 import '../services/signature_image_store.dart';
+import '../services/signature_scan_processor.dart';
 import '../theme/theme.dart';
 import '../widgets/help_screen.dart';
 import '../widgets/navy_app_header.dart';
@@ -34,18 +33,18 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
   @override
   void initState() {
     super.initState();
-    // Open the live scanner as soon as this route is on screen — no extra
-    // tap. Cancel keeps this UI as retry (Gallery / Scan again / shutter).
+    // Open the camera as soon as this route is on screen — no extra tap.
+    // Cancel keeps this UI as retry (Gallery / shutter).
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _initialScanStarted || _busy) return;
       _initialScanStarted = true;
-      _startLiveScan();
+      _captureAndProcess(source: ImageSource.camera);
     });
   }
 
   void _showError(String message) {
     if (!mounted) return;
-    debugPrint('[ScanSignature] ERROR: $message');
+    if (kDebugMode) debugPrint('[ScanSignature] ERROR: $message');
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -54,109 +53,124 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
     );
   }
 
-  /// Preferred path: Google ML Kit Document Scanner (auto-capture, edges,
-  /// crop UI). Android-only; falls back to image_picker camera elsewhere or
-  /// if the scanner fails to start.
-  Future<void> _startLiveScan() async {
-    if (_busy) return;
-
-    if (!kIsWeb && Platform.isAndroid) {
-      final ok = await _scanWithMlKit();
-      if (ok || !mounted) return;
-      debugPrint('[ScanSignature] ML Kit unavailable — falling back to camera');
-    }
-
-    await _captureAndCrop(source: ImageSource.camera);
-  }
-
-  /// Returns `true` if the flow completed or the user cancelled cleanly.
-  /// Returns `false` when the scanner itself failed and we should fall back.
-  Future<bool> _scanWithMlKit() async {
-    setState(() => _busy = true);
-    DocumentScanner? scanner;
+  Future<void> _safeDelete(String? path) async {
+    if (path == null || path.isEmpty) return;
     try {
-      debugPrint('[ScanSignature] starting ML Kit document scanner');
-      scanner = DocumentScanner(
-        options: DocumentScannerOptions(
-          documentFormats: const {DocumentFormat.jpeg},
-          mode: ScannerMode.base,
-          pageLimit: 1,
-          isGalleryImport: false,
-        ),
-      );
-
-      final DocumentScanningResult result;
-      try {
-        result = await scanner.scanDocument();
-      } on PlatformException catch (e) {
-        final code = e.code.toLowerCase();
-        final msg = (e.message ?? '').toLowerCase();
-        if (code.contains('cancel') ||
-            msg.contains('cancel') ||
-            msg.contains('user')) {
-          debugPrint('[ScanSignature] ML Kit cancelled by user');
-          return true;
-        }
-        debugPrint('[ScanSignature] ML Kit PlatformException: $e');
-        return false;
-      } catch (e) {
-        // Null / unexpected result (often user dismiss) — treat as cancel.
-        debugPrint('[ScanSignature] ML Kit scanDocument error: $e');
-        if (e.toString().toLowerCase().contains('null')) return true;
-        return false;
-      }
-
-      final images = result.images;
-      if (images == null || images.isEmpty) {
-        debugPrint('[ScanSignature] ML Kit returned no images (cancel)');
-        return true;
-      }
-
-      final path = images.first;
-      debugPrint('[ScanSignature] ML Kit capture done: $path');
-      if (!mounted) return true;
-
-      try {
-        await _processCapturedPath(path);
-      } catch (e, st) {
-        debugPrint('[ScanSignature] post-scan pipeline failed: $e\n$st');
-        _showError('Could not process signature image: $e');
-      }
-      return true;
-    } catch (e, st) {
-      debugPrint('[ScanSignature] ML Kit failed to start: $e\n$st');
-      return false;
-    } finally {
-      try {
-        await scanner?.close();
-      } catch (_) {}
-      if (mounted) setState(() => _busy = false);
-    }
+      final f = File(path);
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
   }
 
-  Future<void> _captureAndCrop({
+  /// Camera/gallery capture → crop → isolate ink extract (camera) or
+  /// Adjust screen (gallery) → save.
+  Future<void> _captureAndProcess({
     ImageSource source = ImageSource.camera,
   }) async {
     if (_busy) return;
     setState(() => _busy = true);
-    debugPrint('[ScanSignature] capture started source=$source');
 
+    String? rawPath;
+    String? croppedPath;
     try {
       final picker = ImagePicker();
       final photo = await picker.pickImage(
         source: source,
-        imageQuality: 90,
+        maxWidth: source == ImageSource.camera ? 1600 : null,
+        imageQuality: source == ImageSource.camera ? 85 : 90,
       );
-      if (photo == null) {
-        debugPrint('[ScanSignature] pick cancelled by user');
-        return;
-      }
-      debugPrint('[ScanSignature] capture done: ${photo.path}');
+      if (photo == null) return;
+      rawPath = photo.path;
       if (!mounted) return;
 
-      await _processCapturedPath(photo.path);
+      final cropped = await ImageCropper().cropImage(
+        sourcePath: photo.path,
+        compressQuality: 90,
+        uiSettings: [
+          AndroidUiSettings(
+            toolbarTitle: 'Crop signature',
+            toolbarColor: AppColors.navy,
+            toolbarWidgetColor: Colors.white,
+            activeControlsWidgetColor: AppColors.accentPurple,
+            backgroundColor: _previewBg,
+            cropFrameColor: AppColors.accentBlue,
+            cropGridColor: AppColors.accentBlue.withValues(alpha: 0.45),
+            initAspectRatio: CropAspectRatioPreset.original,
+            lockAspectRatio: false,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.ratio4x3,
+            ],
+          ),
+          IOSUiSettings(
+            title: 'Crop signature',
+            doneButtonTitle: 'Done',
+            cancelButtonTitle: 'Cancel',
+            aspectRatioLockEnabled: false,
+            aspectRatioPresets: const [
+              CropAspectRatioPreset.original,
+              CropAspectRatioPreset.ratio16x9,
+              CropAspectRatioPreset.ratio4x3,
+            ],
+          ),
+        ],
+      );
+      if (cropped == null) return;
+      croppedPath = cropped.path;
+      if (!mounted) return;
+
+      late final Uint8List processed;
+      if (source == ImageSource.camera) {
+        // Fast isolate threshold — no Adjust screen for camera captures.
+        final croppedBytes = await XFile(cropped.path).readAsBytes();
+        final result = await compute(
+          processScannedSignatureCompute,
+          SignatureScanProcessParams(bytes: croppedBytes),
+        );
+        if (result == null || result.isEmpty) {
+          _showError('Could not extract the signature — try a clearer photo');
+          return;
+        }
+        processed = result;
+      } else {
+        // Gallery keeps the existing adjust-background UI.
+        final croppedBytes = await XFile(cropped.path).readAsBytes();
+        if (!mounted) return;
+        final adjusted = await Navigator.of(context).push<Uint8List>(
+          MaterialPageRoute(
+            fullscreenDialog: true,
+            builder: (_) =>
+                AdjustSignatureBackgroundScreen(sourceBytes: croppedBytes),
+          ),
+        );
+        if (adjusted == null || adjusted.isEmpty) return;
+        processed = adjusted;
+      }
+
+      final id = 'sig_${DateTime.now().millisecondsSinceEpoch}';
+      final imageRef = await SignatureImageStore.save(id, processed);
+
+      // Drop temp capture/crop files once the final PNG is stored.
+      await _safeDelete(rawPath);
+      if (croppedPath != rawPath) await _safeDelete(croppedPath);
+      rawPath = null;
+      croppedPath = null;
+
+      if (!mounted) return;
+      await context.push(
+        '/save-signature',
+        extra: <String, String>{
+          'name': '',
+          'style': 'Scanned',
+          'source': 'scan',
+          'imagePath': imageRef,
+          'id': id,
+        },
+      );
     } catch (e, st) {
-      debugPrint('[ScanSignature] capture/crop failed: $e\n$st');
+      if (kDebugMode) {
+        debugPrint('[ScanSignature] capture/process failed: $e\n$st');
+      }
       final msg = e.toString().toLowerCase();
       if (msg.contains('permission') ||
           msg.contains('access') ||
@@ -173,85 +187,13 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
         _showError('Could not process signature image: $e');
       }
     } finally {
+      // Best-effort cleanup if we aborted before save.
+      await _safeDelete(rawPath);
+      if (croppedPath != null && croppedPath != rawPath) {
+        await _safeDelete(croppedPath);
+      }
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  /// Shared crop → background adjust → save pipeline for any capture source.
-  Future<void> _processCapturedPath(String sourcePath) async {
-    final cropped = await ImageCropper().cropImage(
-      sourcePath: sourcePath,
-      compressQuality: 92,
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Crop signature',
-          toolbarColor: AppColors.navy,
-          toolbarWidgetColor: Colors.white,
-          activeControlsWidgetColor: AppColors.accentPurple,
-          backgroundColor: _previewBg,
-          cropFrameColor: AppColors.accentBlue,
-          cropGridColor: AppColors.accentBlue.withValues(alpha: 0.45),
-          initAspectRatio: CropAspectRatioPreset.original,
-          lockAspectRatio: false,
-          aspectRatioPresets: const [
-            CropAspectRatioPreset.original,
-            CropAspectRatioPreset.ratio16x9,
-            CropAspectRatioPreset.ratio4x3,
-          ],
-        ),
-        IOSUiSettings(
-          title: 'Crop signature',
-          doneButtonTitle: 'Done',
-          cancelButtonTitle: 'Cancel',
-          aspectRatioLockEnabled: false,
-          aspectRatioPresets: const [
-            CropAspectRatioPreset.original,
-            CropAspectRatioPreset.ratio16x9,
-            CropAspectRatioPreset.ratio4x3,
-          ],
-        ),
-      ],
-    );
-    if (cropped == null) {
-      debugPrint('[ScanSignature] crop cancelled by user');
-      return;
-    }
-    debugPrint('[ScanSignature] crop done: ${cropped.path}');
-    if (!mounted) return;
-
-    final croppedBytes = await XFile(cropped.path).readAsBytes();
-    debugPrint('[ScanSignature] cropped bytes=${croppedBytes.length}');
-
-    if (!mounted) return;
-    final processed = await Navigator.of(context).push<Uint8List>(
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) =>
-            AdjustSignatureBackgroundScreen(sourceBytes: croppedBytes),
-      ),
-    );
-    if (processed == null || processed.isEmpty) {
-      debugPrint('[ScanSignature] background adjust cancelled by user');
-      return;
-    }
-
-    final id = 'sig_${DateTime.now().millisecondsSinceEpoch}';
-    final imageRef = await SignatureImageStore.save(id, processed);
-    debugPrint('[ScanSignature] image stored (${processed.length} bytes)');
-
-    if (!mounted) return;
-    debugPrint('[ScanSignature] navigating to /save-signature');
-    await context.push(
-      '/save-signature',
-      extra: <String, String>{
-        'name': '',
-        'style': 'Scanned',
-        'source': 'scan',
-        'imagePath': imageRef,
-        'id': id,
-      },
-    );
-    debugPrint('[ScanSignature] returned from save-signature');
   }
 
   @override
@@ -301,24 +243,16 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
                                 'lines) gives the cleanest result.',
                           ),
                           HelpStep(
-                            icon: Icons.document_scanner_outlined,
-                            title: 'Hold steady over the signature',
-                            body: 'The scanner captures automatically when '
-                                'it sees the paper — or tap the shutter / '
-                                'pick from Gallery.',
+                            icon: Icons.photo_camera_outlined,
+                            title: 'Capture or pick a photo',
+                            body: 'Tap the camera button to take a photo, '
+                                'or "Gallery" to use an existing one.',
                           ),
                           HelpStep(
                             icon: Icons.crop_rounded,
                             title: 'Crop to the signature',
                             body: 'Trim the photo down to just the '
                                 'signature area.',
-                          ),
-                          HelpStep(
-                            icon: Icons.tune_rounded,
-                            title: 'Adjust the background removal',
-                            body: 'Drag the slider until only your ink is '
-                                'left on the checkered (transparent) '
-                                'background.',
                           ),
                           HelpStep(
                             icon: Icons.save_outlined,
@@ -342,8 +276,8 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
                 const SizedBox(height: 18),
                 Text(
                   _busy
-                      ? 'Opening scanner…'
-                      : 'Place signature in view — captures automatically',
+                      ? 'Processing signature…'
+                      : 'Align signature within frame',
                   textAlign: TextAlign.center,
                   style: AppTextStyles.bodySmall.copyWith(
                     color: Colors.white.withValues(alpha: 0.5),
@@ -365,7 +299,7 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
                         child: _GalleryButton(
                           onPressed: _busy
                               ? null
-                              : () => _captureAndCrop(
+                              : () => _captureAndProcess(
                                     source: ImageSource.gallery,
                                   ),
                         ),
@@ -373,7 +307,11 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
                     ),
                     _CaptureButton(
                       busy: _busy,
-                      onPressed: _busy ? null : _startLiveScan,
+                      onPressed: _busy
+                          ? null
+                          : () => _captureAndProcess(
+                                source: ImageSource.camera,
+                              ),
                     ),
                     // Keeps the capture button centred.
                     const Expanded(child: SizedBox()),
@@ -383,6 +321,15 @@ class _ScanSignatureScreenState extends State<ScanSignatureScreen> {
               ],
             ),
           ),
+          if (_busy)
+            const ColoredBox(
+              color: Color(0x66000000),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.accentPurple,
+                ),
+              ),
+            ),
         ],
       ),
     );

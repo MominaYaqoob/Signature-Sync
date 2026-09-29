@@ -5,9 +5,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../services/ads_service.dart';
 import '../theme/theme.dart';
 
-/// Compact native ad for the home feed. Uses the small template so the
-/// card only takes the height the creative needs — no tall empty slab
-/// under the ad. Collapses to nothing if load fails (or on web).
+/// Compact home native ad — [TemplateType.small] (icon + copy + CTA, no
+/// large media). Fixed 168-tall card; collapses to nothing until loaded.
 class NativeAdCard extends StatefulWidget {
   const NativeAdCard({super.key});
 
@@ -16,6 +15,10 @@ class NativeAdCard extends StatefulWidget {
 }
 
 class _NativeAdCardState extends State<NativeAdCard> {
+  static const double _slotHeight = 168;
+  static const double _radius = 14;
+  static const Color _teal = Color(0xFF0D9488);
+
   NativeAd? _ad;
   bool _failed = false;
 
@@ -43,28 +46,27 @@ class _NativeAdCardState extends State<NativeAdCard> {
         },
       ),
       nativeTemplateStyle: NativeTemplateStyle(
-        // Small template ≈ one compact card row — fits the home feed
-        // without reserving medium-template empty space below the creative.
         templateType: TemplateType.small,
-        mainBackgroundColor: AppColors.cardBackground,
-        cornerRadius: AppRadii.md,
+        mainBackgroundColor: Colors.white,
+        cornerRadius: _radius,
         callToActionTextStyle: NativeTemplateTextStyle(
-          textColor: AppColors.textOnAccent,
-          backgroundColor: AppColors.accentPurple,
+          textColor: Colors.white,
+          backgroundColor: _teal,
           style: NativeTemplateFontStyle.bold,
-          size: 12,
+          size: 14,
         ),
         primaryTextStyle: NativeTemplateTextStyle(
           textColor: AppColors.textPrimary,
           style: NativeTemplateFontStyle.bold,
-          size: 13,
+          size: 14,
         ),
         secondaryTextStyle: NativeTemplateTextStyle(
           textColor: AppColors.textSecondary,
-          size: 11,
+          size: 12,
         ),
         tertiaryTextStyle: NativeTemplateTextStyle(
-          textColor: AppColors.textSecondary,
+          textColor: _teal,
+          style: NativeTemplateFontStyle.bold,
           size: 10,
         ),
       ),
@@ -82,14 +84,23 @@ class _NativeAdCardState extends State<NativeAdCard> {
     final ad = _ad;
     if (ad == null || _failed) return const SizedBox.shrink();
 
-    // Height matches the small native template (~90–120); no minHeight
-    // padding that left blank space under the ad.
     return Container(
-      height: 112,
-      decoration: AppDecorations.card(
-        radius: AppRadii.md,
-        color: AppColors.cardBackground,
-        borderColor: AppColors.accentPurple.withValues(alpha: 0.16),
+      width: double.infinity,
+      height: _slotHeight,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(_radius),
+        border: Border.all(
+          color: AppColors.borderSoft.withValues(alpha: 0.95),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: AdWidget(ad: ad),
