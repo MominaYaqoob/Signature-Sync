@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
@@ -136,7 +137,14 @@ class _AgreeScreenState extends State<AgreeScreen> {
                                     fontWeight: FontWeight.w700,
                                   ),
                                   recognizer: TapGestureRecognizer()
-                                    ..onTap = () => context.push('/privacy'),
+                                    ..onTap = () {
+                                      launchUrl(
+                                        Uri.parse(
+                                          'https://learnwithfunpuzzlegame.blogspot.com/2026/09/signature-maker.html',
+                                        ),
+                                        mode: LaunchMode.externalApplication,
+                                      );
+                                    },
                                 ),
                                 const TextSpan(
                                   text: ' and how my signatures and '

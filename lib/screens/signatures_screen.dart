@@ -4,7 +4,6 @@ import '../models/signature_model.dart';
 import '../services/signature_image_store.dart';
 import '../services/storage_service.dart';
 import '../theme/theme.dart';
-import '../widgets/accent_title.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/signature_actions.dart';
 import '../widgets/signature_visual.dart';
@@ -17,6 +16,10 @@ class SignaturesScreen extends StatefulWidget {
 }
 
 class _SignaturesScreenState extends State<SignaturesScreen> {
+  bool _searchOpen = false;
+  final _searchController = TextEditingController();
+  String _query = '';
+
   @override
   void initState() {
     super.initState();
@@ -24,6 +27,19 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
 
   void _reload() {
     if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<SignatureModel> get _filtered {
+    final all = StorageService.getAllSignatures();
+    final q = _query.trim().toLowerCase();
+    if (q.isEmpty) return all;
+    return all.where((s) => s.name.toLowerCase().contains(q)).toList();
   }
 
   Future<void> _showCreateSheet() async {
@@ -278,8 +294,9 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
   }
 
   Widget _buildContent(BuildContext context) {
-    final signatures = StorageService.getAllSignatures();
-    final isEmpty = signatures.isEmpty;
+    final allSignatures = StorageService.getAllSignatures();
+    final signatures = _filtered;
+    final isEmpty = allSignatures.isEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.primaryBackground,
@@ -291,10 +308,99 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
               top: AppSpacing.lg,
               bottom: AppSpacing.md,
             ),
-            child: AccentTitle(
-              title: 'My Signatures',
-              accent: AppColors.navy,
-              style: AppTextStyles.titleLarge.copyWith(fontSize: 22),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.sm,
+              ),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [
+                    Color(0xFF243556),
+                    AppColors.navy,
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(AppRadii.md),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.navy.withValues(alpha: 0.22),
+                    blurRadius: 12,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: _searchOpen
+                  ? TextField(
+                      controller: _searchController,
+                      autofocus: true,
+                      onChanged: (value) => setState(() => _query = value),
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: AppColors.textOnAccent,
+                      ),
+                      cursorColor: AppColors.textOnAccent,
+                      decoration: InputDecoration(
+                        hintText: 'Search signatures',
+                        hintStyle: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.navyMuted,
+                        ),
+                        isDense: true,
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: 10,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(AppRadii.sm),
+                          borderSide: BorderSide.none,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: AppColors.textOnAccent,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _searchOpen = false;
+                              _query = '';
+                              _searchController.clear();
+                            });
+                          },
+                        ),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'My Signatures',
+                            style: AppTextStyles.titleLarge.copyWith(
+                              fontSize: 22,
+                              color: AppColors.textOnAccent,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'New signature',
+                          onPressed: _showCreateSheet,
+                          icon: const Icon(
+                            Icons.add_rounded,
+                            color: AppColors.textOnAccent,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () =>
+                              setState(() => _searchOpen = true),
+                          icon: const Icon(
+                            Icons.search_rounded,
+                            color: AppColors.textOnAccent,
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
           if (!isEmpty)
@@ -309,9 +415,9 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      signatures.length == 1
+                      allSignatures.length == 1
                           ? '1 saved signature'
-                          : '${signatures.length} saved signatures',
+                          : '${allSignatures.length} saved signatures',
                       style: AppTextStyles.bodySmall,
                     ),
                   ),
@@ -322,36 +428,43 @@ class _SignaturesScreenState extends State<SignaturesScreen> {
           Expanded(
             child: isEmpty
                 ? _EmptySignatures(onCreate: _showCreateSheet)
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.xl,
-                      AppSpacing.xs,
-                      AppSpacing.xl,
-                      AppSpacing.xl,
-                    ),
-                    itemCount: signatures.length,
-                    separatorBuilder: (_, _) =>
-                        const SizedBox(height: AppSpacing.sm),
-                    itemBuilder: (context, index) {
-                      final signature = signatures[index];
-                      final color = index.isEven
-                          ? AppColors.accentPurple
-                          : AppColors.accentBlue;
-                      return _SignatureCard(
-                        signature: signature,
-                        color: color,
-                        onTap: () => context
-                            .push(
-                          '/signature-detail',
-                          extra: signature,
-                        )
-                            .then((_) {
-                          if (mounted) _reload();
-                        }),
-                        onMenu: () => _openMenu(signature),
-                      );
-                    },
-                  ),
+                : signatures.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No matches',
+                          style: AppTextStyles.secondary,
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.xl,
+                          AppSpacing.xs,
+                          AppSpacing.xl,
+                          AppSpacing.xl,
+                        ),
+                        itemCount: signatures.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.sm),
+                        itemBuilder: (context, index) {
+                          final signature = signatures[index];
+                          final color = index.isEven
+                              ? AppColors.accentPurple
+                              : AppColors.accentBlue;
+                          return _SignatureCard(
+                            signature: signature,
+                            color: color,
+                            onTap: () => context
+                                .push(
+                              '/signature-detail',
+                              extra: signature,
+                            )
+                                .then((_) {
+                              if (mounted) _reload();
+                            }),
+                            onMenu: () => _openMenu(signature),
+                          );
+                        },
+                      ),
           ),
         ],
       ),

@@ -26,11 +26,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
     // yet listed, no store app installed, etc.) falls back to a message
     // instead of a silent no-op.
     final uri = Uri.parse(
-      'https://play.google.com/store/apps/details?id=com.signaturesync.signature_sync',
+      'https://play.google.com/store/apps/details?id=com.sid.signature.maker',
     );
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched && mounted) {
       _toast('Could not open the Play Store on this device.');
+    }
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(
+      'https://learnwithfunpuzzlegame.blogspot.com/2026/09/signature-maker.html',
+    );
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      _toast('Could not open the Privacy Policy.');
     }
   }
 
@@ -132,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 10),
             _SettingsCard(
-              onTap: () => context.push('/privacy'),
+              onTap: _openPrivacyPolicy,
               child: const _SettingsRow(
                 icon: Icons.privacy_tip_outlined,
                 label: 'Privacy policy',

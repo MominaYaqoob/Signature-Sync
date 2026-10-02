@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -298,27 +299,50 @@ class _SignSuccessScreenState extends State<SignSuccessScreen> {
   Future<void> _saveToDevice() async {
     final path = _document?.filePath;
     if (path == null) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Choose "Save to Files" (or "Save to Photos") next'),
-      ),
-    );
-    final label = _shareLabel;
-    await SharePlus.instance.share(
-      ShareParams(
-        files: [
-          XFile(
-            path,
-            name: _shareFileName(),
-            mimeType: _document!.isPdf
-                ? 'application/pdf'
-                : signedImageMimeType(_document!.filePath),
-          ),
-        ],
-        subject: label,
-        text: label,
-      ),
-    );
+
+    try {
+      final source = File(path);
+      if (!await source.exists()) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Signed file is missing')),
+        );
+        return;
+      }
+
+      final bytes = await source.readAsBytes();
+      final name = _shareFileName();
+      final ext = name.contains('.')
+          ? name.split('.').last.toLowerCase()
+          : (_document!.isPdf ? 'pdf' : 'jpg');
+
+      // SAF via file_picker — no READ/WRITE_EXTERNAL_STORAGE needed.
+      final savedPath = await FilePicker.platform.saveFile(
+        dialogTitle: 'Save to device',
+        fileName: name,
+        type: FileType.custom,
+        allowedExtensions: [ext],
+        bytes: bytes,
+      );
+
+      if (!mounted) return;
+      if (savedPath == null) return; // user cancelled
+
+      // Desktop returns a path without writing; mobile writes [bytes] via SAF.
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        await File(savedPath).writeAsBytes(bytes, flush: true);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved to device')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: $e')),
+      );
+    }
   }
 
   @override

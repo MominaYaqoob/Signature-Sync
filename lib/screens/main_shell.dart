@@ -178,7 +178,7 @@ const _tabs = <_NavTab>[
   ),
 ];
 
-/// White tab bar: rounded bordered pills + top partition.
+/// Soft selected pill; unselected is icon + light label only (no hard box).
 class _NavPillButton extends StatelessWidget {
   const _NavPillButton({
     required this.label,
@@ -210,13 +210,9 @@ class _NavPillButton extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
         decoration: BoxDecoration(
           color: selected
-              ? _active.withValues(alpha: 0.08)
-              : AppColors.primaryBackground,
+              ? _active.withValues(alpha: 0.10)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? _active : AppColors.borderSoft,
-            width: selected ? 1.4 : 1.2,
-          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -234,7 +230,7 @@ class _NavPillButton extends StatelessWidget {
               textAlign: TextAlign.center,
               style: AppTextStyles.labelMedium.copyWith(
                 fontSize: 11,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                 color: color,
               ),
             ),

@@ -5,8 +5,9 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import '../services/ads_service.dart';
 import '../theme/theme.dart';
 
-/// Compact home native ad — [TemplateType.small] (icon + copy + CTA, no
-/// large media). Fixed 168-tall card; collapses to nothing until loaded.
+/// Home native ad — Arrow Drift–style small card (no media, CTA full-width
+/// at bottom). Uses Android factory `nativeAdSmall` + [native_ad_small.xml].
+/// Collapses to nothing until loaded / on failure.
 class NativeAdCard extends StatefulWidget {
   const NativeAdCard({super.key});
 
@@ -17,7 +18,6 @@ class NativeAdCard extends StatefulWidget {
 class _NativeAdCardState extends State<NativeAdCard> {
   static const double _slotHeight = 168;
   static const double _radius = 14;
-  static const Color _teal = Color(0xFF0D9488);
 
   NativeAd? _ad;
   bool _failed = false;
@@ -31,6 +31,7 @@ class _NativeAdCardState extends State<NativeAdCard> {
   void _load() {
     NativeAd(
       adUnitId: TestAdUnitIds.native,
+      factoryId: 'nativeAdSmall',
       request: const AdRequest(),
       listener: NativeAdListener(
         onAdLoaded: (ad) {
@@ -44,31 +45,6 @@ class _NativeAdCardState extends State<NativeAdCard> {
           ad.dispose();
           if (mounted) setState(() => _failed = true);
         },
-      ),
-      nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.small,
-        mainBackgroundColor: Colors.white,
-        cornerRadius: _radius,
-        callToActionTextStyle: NativeTemplateTextStyle(
-          textColor: Colors.white,
-          backgroundColor: _teal,
-          style: NativeTemplateFontStyle.bold,
-          size: 14,
-        ),
-        primaryTextStyle: NativeTemplateTextStyle(
-          textColor: AppColors.textPrimary,
-          style: NativeTemplateFontStyle.bold,
-          size: 14,
-        ),
-        secondaryTextStyle: NativeTemplateTextStyle(
-          textColor: AppColors.textSecondary,
-          size: 12,
-        ),
-        tertiaryTextStyle: NativeTemplateTextStyle(
-          textColor: _teal,
-          style: NativeTemplateFontStyle.bold,
-          size: 10,
-        ),
       ),
     ).load();
   }
